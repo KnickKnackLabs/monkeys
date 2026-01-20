@@ -11,6 +11,12 @@ PROMPT="${usage_prompt}"
 OUTPUT="${usage_output}"
 MODEL="${usage_model}"
 TOKEN="${usage_token:-$HF_TOKEN}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+
+# Resolve relative output paths to caller's directory
+if [[ "$OUTPUT" != /* ]]; then
+    OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
 
 if [[ -z "$TOKEN" ]]; then
     echo "Error: No API token provided"
