@@ -26,11 +26,13 @@ echo "  Prompt: $PROMPT"
 echo "  Model: $MODEL"
 echo "  Output: $OUTPUT"
 
+JSON_PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{inputs: $prompt}')
+
 HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT" \
     -X POST "$API_URL" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"inputs\": \"$PROMPT\"}")
+    -d "$JSON_PAYLOAD")
 
 if [[ "$HTTP_CODE" -ne 200 ]]; then
     echo "Error: API request failed with status $HTTP_CODE" >&2
