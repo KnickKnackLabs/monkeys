@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+#MISE description="Generate an image from a text prompt"
+#USAGE arg "<prompt>" help="Text prompt describing the image to generate"
+#USAGE flag "-o --output <file>" help="Output file path" default="output.png"
+#USAGE flag "--model <model>" help="Hugging Face model" default="black-forest-labs/FLUX.1-schnell"
+#USAGE flag "--token <token>" help="Hugging Face API token (or set HF_TOKEN env var)"
+
+set -e
+
+PROMPT="${usage_prompt}"
+OUTPUT="${usage_output}"
+MODEL="${usage_model}"
+TOKEN="${usage_token:-$HF_TOKEN}"
+
+if [[ -z "$TOKEN" ]]; then
+    echo "Error: No API token provided"
+    echo "Either pass --token or set HF_TOKEN environment variable"
+    echo "Get a token at https://huggingface.co/settings/tokens"
+    exit 1
+fi
+
+API_URL="https://router.huggingface.co/hf-inference/models/${MODEL}"
+
+echo "Generating image..."
+echo "  Prompt: $PROMPT"
+echo "  Model: $MODEL"
+echo "  Output: $OUTPUT"
+
+JSON_PAYLOAD=$(jq -n --arg prompt "$PROMPT" '{inputs: $prompt}')
+
+HTTP_CODE=$(curl -s -w "%{http_code}" -o "$OUTPUT" \
+    -X POST "$API_URL" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$JSON_PAYLOAD")
+
+if [[ "$HTTP_CODE" -ne 200 ]]; then
+    echo "Error: API request failed with status $HTTP_CODE" >&2
+    if [[ -f "$OUTPUT" ]]; then
+        cat "$OUTPUT" >&2
+        rm -f "$OUTPUT"
+    fi
+    exit 1
+fi
+
+echo "Done! Image saved to $OUTPUT"
