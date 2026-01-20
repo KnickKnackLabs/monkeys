@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #MISE description="Generate an image from a text prompt"
 #USAGE arg "<prompt>" help="Text prompt describing the image to generate"
-#USAGE flag "-o --output <file>" help="Output file path" default="output.png"
+#USAGE flag "-o --output <file>" help="Output file path" default="output.jpg"
 #USAGE flag "--model <model>" help="Hugging Face model" default="black-forest-labs/FLUX.1-schnell"
 #USAGE flag "--token <token>" help="Hugging Face API token (or set HF_TOKEN env var)"
+#USAGE flag "--no-meta" help="Don't save metadata sidecar file"
 
 set -e
 
@@ -11,12 +12,16 @@ PROMPT="${usage_prompt}"
 OUTPUT="${usage_output}"
 MODEL="${usage_model}"
 TOKEN="${usage_token:-$HF_TOKEN}"
+NO_META="${usage_no_meta:-false}"
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 
 # Resolve relative output paths to caller's directory
 if [[ "$OUTPUT" != /* ]]; then
     OUTPUT="${CALLER_DIR}/${OUTPUT}"
 fi
+
+# Get the requested extension
+REQUESTED_EXT="${OUTPUT##*.}"
 
 if [[ -z "$TOKEN" ]]; then
     echo "Error: No API token provided"
@@ -49,4 +54,42 @@ if [[ "$HTTP_CODE" -ne 200 ]]; then
     exit 1
 fi
 
-echo "Done! Image saved to $OUTPUT"
+# Detect actual format from file magic bytes
+ACTUAL_FORMAT=""
+if [[ -f "$OUTPUT" ]]; then
+    MAGIC=$(xxd -l 3 -p "$OUTPUT" 2>/dev/null || echo "")
+    if [[ "$MAGIC" == "ffd8ff" ]]; then
+        ACTUAL_FORMAT="jpg"
+    elif [[ "$MAGIC" == "89504e" ]]; then
+        ACTUAL_FORMAT="png"
+    fi
+fi
+
+# Fix extension if mismatched
+FINAL_OUTPUT="$OUTPUT"
+if [[ -n "$ACTUAL_FORMAT" && "$REQUESTED_EXT" != "$ACTUAL_FORMAT" ]]; then
+    # Replace extension with actual format
+    FINAL_OUTPUT="${OUTPUT%.*}.${ACTUAL_FORMAT}"
+    mv "$OUTPUT" "$FINAL_OUTPUT"
+    echo "  Note: API returned ${ACTUAL_FORMAT}, saved as $FINAL_OUTPUT"
+else
+    echo "Done! Image saved to $FINAL_OUTPUT"
+fi
+
+# Save metadata sidecar
+if [[ "$NO_META" != "true" ]]; then
+    META_FILE="${FINAL_OUTPUT%.*}.json"
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    SIZE_BYTES=$(stat -f%z "$FINAL_OUTPUT" 2>/dev/null || stat -c%s "$FINAL_OUTPUT" 2>/dev/null || echo "0")
+
+    jq -n \
+        --arg prompt "$PROMPT" \
+        --arg model "$MODEL" \
+        --arg timestamp "$TIMESTAMP" \
+        --arg format "${ACTUAL_FORMAT:-unknown}" \
+        --argjson size "$SIZE_BYTES" \
+        --arg output "$(basename "$FINAL_OUTPUT")" \
+        '{prompt: $prompt, model: $model, timestamp: $timestamp, format: $format, size_bytes: $size, output: $output}' \
+        > "$META_FILE"
+    echo "  Metadata saved to $META_FILE"
+fi
