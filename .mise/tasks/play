@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#MISE description="Play an audio file"
+#MISE hide=true
+#USAGE arg "<file>" help="Audio file to play"
+
+set -e
+
+FILE="${usage_file}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+
+# Resolve relative paths to caller's directory
+if [[ "$FILE" != /* ]]; then
+    FILE="${CALLER_DIR}/${FILE}"
+fi
+
+if [[ ! -f "$FILE" ]]; then
+    echo "Error: File not found: $FILE" >&2
+    exit 1
+fi
+
+case "$(uname -s)" in
+    Darwin)
+        if ! command -v afplay &>/dev/null; then
+            echo "Error: afplay not found (expected on macOS)" >&2
+            exit 1
+        fi
+        afplay "$FILE"
+        ;;
+    Linux)
+        if command -v aplay &>/dev/null; then
+            aplay "$FILE"
+        elif command -v paplay &>/dev/null; then
+            paplay "$FILE"
+        elif command -v ffplay &>/dev/null; then
+            ffplay -nodisp -autoexit "$FILE"
+        else
+            echo "Error: No audio player found. Install aplay, paplay, or ffplay." >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Error: Unsupported OS: $(uname -s)" >&2
+        exit 1
+        ;;
+esac

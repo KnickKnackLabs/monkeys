@@ -84,5 +84,5 @@ fi
 
 # Play audio if requested
 if [[ "$PLAY" == "true" ]]; then
-    afplay "$OUTPUT"
+    mise run play "$OUTPUT"
 fi
