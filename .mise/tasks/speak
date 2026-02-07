@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+#MISE description="Generate speech from text"
+#USAGE arg "<text>" help="Text to convert to speech"
+#USAGE flag "-o --output <file>" help="Output file path" default="output.wav"
+#USAGE flag "--voice <voice>" help="Voice to use (e.g. af_heart, af_bella, am_adam)" default="af_heart"
+#USAGE flag "--speed <speed>" help="Speech speed multiplier" default="1.0"
+#USAGE flag "--play" help="Play audio after generating"
+#USAGE flag "--no-meta" help="Don't save metadata sidecar file"
+
+set -e
+
+TEXT="${usage_text}"
+OUTPUT="${usage_output}"
+VOICE="${usage_voice}"
+SPEED="${usage_speed}"
+PLAY="${usage_play:-false}"
+NO_META="${usage_no_meta:-false}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Resolve relative output paths to caller's directory
+if [[ "$OUTPUT" != /* ]]; then
+    OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+# Model cache directory
+MODEL_DIR="${HOME}/.cache/monkeys/kokoro"
+MODEL_FILE="${MODEL_DIR}/kokoro-v1.0.onnx"
+VOICES_FILE="${MODEL_DIR}/voices-v1.0.bin"
+RELEASE_URL="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0"
+
+# Download models on first run
+if [[ ! -f "$MODEL_FILE" || ! -f "$VOICES_FILE" ]]; then
+    echo "Downloading Kokoro model files (first run only)..."
+    mkdir -p "$MODEL_DIR"
+
+    if [[ ! -f "$MODEL_FILE" ]]; then
+        echo "  Downloading kokoro-v1.0.onnx (~310 MB)..."
+        curl -L -o "$MODEL_FILE" "${RELEASE_URL}/kokoro-v1.0.onnx"
+    fi
+
+    if [[ ! -f "$VOICES_FILE" ]]; then
+        echo "  Downloading voices-v1.0.bin..."
+        curl -L -o "$VOICES_FILE" "${RELEASE_URL}/voices-v1.0.bin"
+    fi
+
+    echo "  Done! Models cached at $MODEL_DIR"
+fi
+
+echo "Generating speech..."
+echo "  Text: $TEXT"
+echo "  Voice: $VOICE"
+echo "  Speed: $SPEED"
+echo "  Output: $OUTPUT"
+
+uv run "$REPO_DIR/scripts/speak.py" \
+    --text "$TEXT" \
+    --output "$OUTPUT" \
+    --voice "$VOICE" \
+    --speed "$SPEED" \
+    --model-dir "$MODEL_DIR"
+
+echo "Done! Audio saved to $OUTPUT"
+
+# Save metadata sidecar
+if [[ "$NO_META" != "true" ]]; then
+    META_FILE="${OUTPUT%.*}.json"
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    SIZE_BYTES=$(stat -f%z "$OUTPUT" 2>/dev/null || stat -c%s "$OUTPUT" 2>/dev/null || echo "0")
+
+    jq -n \
+        --arg text "$TEXT" \
+        --arg voice "$VOICE" \
+        --arg speed "$SPEED" \
+        --arg model "kokoro-v1.0" \
+        --arg timestamp "$TIMESTAMP" \
+        --argjson size "$SIZE_BYTES" \
+        --arg output "$(basename "$OUTPUT")" \
+        '{text: $text, voice: $voice, speed: $speed, model: $model, timestamp: $timestamp, size_bytes: $size, output: $output}' \
+        > "$META_FILE"
+    echo "  Metadata saved to $META_FILE"
+fi
+
+# Play audio if requested
+if [[ "$PLAY" == "true" ]]; then
+    afplay "$OUTPUT"
+fi

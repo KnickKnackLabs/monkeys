@@ -1,5 +1,8 @@
 # mise
 .mise.local.toml
 
+# Output
+*.wav
+
 # OS
 .DS_Store
