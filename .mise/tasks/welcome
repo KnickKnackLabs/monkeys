@@ -38,6 +38,12 @@ else
 fi
 echo "  speak:    runs locally, no token needed"
 echo ""
+# Cache stats
+STATS=$(mise run --quiet _cache-stats)
+CACHE_COUNT="${STATS%% *}"
+CACHE_SIZE="${STATS#* }"
+echo "  Cache:    $CACHE_COUNT entries, $CACHE_SIZE"
+echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "Location: $REPO_DIR"

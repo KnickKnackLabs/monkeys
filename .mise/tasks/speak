@@ -5,6 +5,7 @@
 #USAGE flag "--voice <voice>" help="Voice to use (e.g. af_heart, af_bella, am_adam)" default="af_heart"
 #USAGE flag "--speed <speed>" help="Speech speed multiplier" default="1.0"
 #USAGE flag "--play" help="Play audio after generating"
+#USAGE flag "--no-cache" help="Skip cache (force regeneration)"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
 
 set -e
@@ -14,6 +15,7 @@ OUTPUT="${usage_output}"
 VOICE="${usage_voice}"
 SPEED="${usage_speed}"
 PLAY="${usage_play:-false}"
+NO_CACHE="${usage_no_cache:-false}"
 NO_META="${usage_no_meta:-false}"
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -48,20 +50,37 @@ if [[ ! -f "$MODEL_FILE" || ! -f "$VOICES_FILE" ]]; then
     echo "  Done! Models cached at $MODEL_DIR"
 fi
 
-echo "Generating speech..."
-echo "  Text: $TEXT"
-echo "  Voice: $VOICE"
-echo "  Speed: $SPEED"
-echo "  Output: $OUTPUT"
+# Audio cache
+AUDIO_CACHE_DIR="${HOME}/.cache/monkeys/audio"
+CACHE_KEY=$(echo -n "${TEXT}|${VOICE}|${SPEED}" | shasum -a 256 | cut -d' ' -f1)
+CACHE_FILE="${AUDIO_CACHE_DIR}/${CACHE_KEY}.wav"
 
-uv run "$REPO_DIR/scripts/speak.py" \
-    --text "$TEXT" \
-    --output "$OUTPUT" \
-    --voice "$VOICE" \
-    --speed "$SPEED" \
-    --model-dir "$MODEL_DIR"
+# Check cache
+if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then
+    cp "$CACHE_FILE" "$OUTPUT"
+    echo "Cache hit! Audio copied to $OUTPUT"
+else
+    echo "Generating speech..."
+    echo "  Text: $TEXT"
+    echo "  Voice: $VOICE"
+    echo "  Speed: $SPEED"
+    echo "  Output: $OUTPUT"
 
-echo "Done! Audio saved to $OUTPUT"
+    uv run "$REPO_DIR/scripts/speak.py" \
+        --text "$TEXT" \
+        --output "$OUTPUT" \
+        --voice "$VOICE" \
+        --speed "$SPEED" \
+        --model-dir "$MODEL_DIR"
+
+    echo "Done! Audio saved to $OUTPUT"
+
+    # Store in cache
+    if [[ "$NO_CACHE" != "true" ]]; then
+        mkdir -p "$AUDIO_CACHE_DIR"
+        cp "$OUTPUT" "$CACHE_FILE"
+    fi
+fi
 
 # Save metadata sidecar
 if [[ "$NO_META" != "true" ]]; then
