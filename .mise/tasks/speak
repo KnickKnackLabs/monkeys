@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #MISE description="Generate speech from text"
-#USAGE arg "<text>" help="Text to convert to speech"
+#USAGE arg "[text]" help="Text to convert to speech (reads from stdin if omitted)"
 #USAGE flag "-o --output <file>" help="Output file path" default="output.wav"
 #USAGE flag "--voice <voice>" help="Voice to use (e.g. af_heart, af_bella, am_adam)" default="af_heart"
 #USAGE flag "--speed <speed>" help="Speech speed multiplier" default="1.0"
 #USAGE flag "--play" help="Play audio after generating"
+#USAGE flag "--stdout" help="Write WAV audio to stdout instead of file"
 #USAGE flag "--no-cache" help="Skip cache (force regeneration)"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
 
@@ -15,15 +16,39 @@ OUTPUT="${usage_output}"
 VOICE="${usage_voice}"
 SPEED="${usage_speed}"
 PLAY="${usage_play:-false}"
+STDOUT="${usage_stdout:-false}"
 NO_CACHE="${usage_no_cache:-false}"
 NO_META="${usage_no_meta:-false}"
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Read text from stdin if no argument provided
+if [[ -z "$TEXT" ]]; then
+    if [[ -t 0 ]]; then
+        echo "Error: Provide text as an argument or pipe to stdin" >&2
+        exit 1
+    fi
+    trap '' INT   # Survive Ctrl+C from upstream (e.g. record stopping)
+    TEXT=$(cat)
+    trap - INT    # Restore default signal handling
+    if [[ -z "$TEXT" ]]; then
+        echo "Error: No text received from stdin" >&2
+        exit 1
+    fi
+fi
+
 # Resolve relative output paths to caller's directory
 if [[ "$OUTPUT" != /* ]]; then
     OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+# In stdout mode, write to temp file and skip metadata
+if [[ "$STDOUT" == "true" ]]; then
+    SPEAK_TMPDIR=$(mktemp -d /tmp/monkeys-speak-XXXXXX)
+    trap 'rm -rf "$SPEAK_TMPDIR"' EXIT
+    OUTPUT="${SPEAK_TMPDIR}/output.wav"
+    NO_META="true"
 fi
 
 # Model cache directory
@@ -34,20 +59,20 @@ RELEASE_URL="https://github.com/thewh1teagle/kokoro-onnx/releases/download/model
 
 # Download models on first run
 if [[ ! -f "$MODEL_FILE" || ! -f "$VOICES_FILE" ]]; then
-    echo "Downloading Kokoro model files (first run only)..."
+    echo "Downloading Kokoro model files (first run only)..." >&2
     mkdir -p "$MODEL_DIR"
 
     if [[ ! -f "$MODEL_FILE" ]]; then
-        echo "  Downloading kokoro-v1.0.onnx (~310 MB)..."
+        echo "  Downloading kokoro-v1.0.onnx (~310 MB)..." >&2
         curl -L -o "$MODEL_FILE" "${RELEASE_URL}/kokoro-v1.0.onnx"
     fi
 
     if [[ ! -f "$VOICES_FILE" ]]; then
-        echo "  Downloading voices-v1.0.bin..."
+        echo "  Downloading voices-v1.0.bin..." >&2
         curl -L -o "$VOICES_FILE" "${RELEASE_URL}/voices-v1.0.bin"
     fi
 
-    echo "  Done! Models cached at $MODEL_DIR"
+    echo "  Done! Models cached at $MODEL_DIR" >&2
 fi
 
 # Audio cache
@@ -58,13 +83,13 @@ CACHE_FILE="${AUDIO_CACHE_DIR}/${CACHE_KEY}.wav"
 # Check cache
 if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then
     cp "$CACHE_FILE" "$OUTPUT"
-    echo "Cache hit! Audio copied to $OUTPUT"
+    echo "Cache hit! Audio copied to $OUTPUT" >&2
 else
-    echo "Generating speech..."
-    echo "  Text: $TEXT"
-    echo "  Voice: $VOICE"
-    echo "  Speed: $SPEED"
-    echo "  Output: $OUTPUT"
+    echo "Generating speech..." >&2
+    echo "  Text: $TEXT" >&2
+    echo "  Voice: $VOICE" >&2
+    echo "  Speed: $SPEED" >&2
+    echo "  Output: $OUTPUT" >&2
 
     uv run "$REPO_DIR/scripts/speak.py" \
         --text "$TEXT" \
@@ -73,7 +98,7 @@ else
         --speed "$SPEED" \
         --model-dir "$MODEL_DIR"
 
-    echo "Done! Audio saved to $OUTPUT"
+    echo "Done! Audio saved to $OUTPUT" >&2
 
     # Store in cache
     if [[ "$NO_CACHE" != "true" ]]; then
@@ -98,10 +123,15 @@ if [[ "$NO_META" != "true" ]]; then
         --arg output "$(basename "$OUTPUT")" \
         '{text: $text, voice: $voice, speed: $speed, model: $model, timestamp: $timestamp, size_bytes: $size, output: $output}' \
         > "$META_FILE"
-    echo "  Metadata saved to $META_FILE"
+    echo "  Metadata saved to $META_FILE" >&2
 fi
 
 # Play audio if requested
 if [[ "$PLAY" == "true" ]]; then
     mise run play "$OUTPUT"
+fi
+
+# Write to stdout if requested
+if [[ "$STDOUT" == "true" ]]; then
+    cat "$OUTPUT"
 fi
