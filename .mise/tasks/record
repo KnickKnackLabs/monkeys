@@ -51,6 +51,13 @@ else
     echo "Recording... (press Ctrl+C to stop)" >&2
 fi
 
-ffmpeg "${FFMPEG_ARGS[@]}" "$OUTPUT" 2>/dev/null
+# Run ffmpeg — Ctrl+C causes a non-zero exit but the file is still valid
+ffmpeg "${FFMPEG_ARGS[@]}" "$OUTPUT" 2>/dev/null || true
+
+# Verify we got a recording
+if [[ ! -s "$OUTPUT" ]]; then
+    echo "Error: Recording failed (empty file)" >&2
+    exit 1
+fi
 
 echo "Saved to $OUTPUT" >&2

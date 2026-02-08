@@ -21,7 +21,8 @@ REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Record from microphone if --record flag is set
 if [[ "$RECORD" == "true" ]]; then
-    RECORD_FILE=$(mktemp /tmp/monkeys-record-XXXXXX.wav)
+    RECORD_TMPDIR=$(mktemp -d /tmp/monkeys-record-XXXXXX)
+    RECORD_FILE="${RECORD_TMPDIR}/recording.wav"
     RECORD_ARGS=("$RECORD_FILE")
     if [[ -n "$DURATION" ]]; then
         RECORD_ARGS+=(-d "$DURATION")
@@ -61,8 +62,9 @@ MODEL_DIR="${HOME}/.cache/monkeys/whisper"
 mkdir -p "$MODEL_DIR"
 
 # Resample to 16kHz WAV (whisper requirement)
-TMPFILE=$(mktemp /tmp/monkeys-listen-XXXXXX.wav)
-trap 'rm -f "$TMPFILE" "${RECORD_FILE:-}"' EXIT
+LISTEN_TMPDIR=$(mktemp -d /tmp/monkeys-listen-XXXXXX)
+TMPFILE="${LISTEN_TMPDIR}/resampled.wav"
+trap 'rm -rf "$LISTEN_TMPDIR" "${RECORD_TMPDIR:-}"' EXIT
 ffmpeg -i "$FILE" -ar 16000 -ac 1 -y "$TMPFILE" 2>/dev/null
 
 # Transcription cache
