@@ -50,8 +50,7 @@ ffmpeg -i "$FILE" -ar 16000 -ac 1 -y "$TMPFILE" 2>/dev/null
 # Transcription cache
 TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
 FILE_HASH=$(shasum -a 256 "$TMPFILE" | cut -d' ' -f1)
-CACHE_KEY=$(echo -n "${FILE_HASH}|${MODEL}" | shasum -a 256 | cut -d' ' -f1)
-CACHE_FILE="${TRANSCRIPT_CACHE_DIR}/${CACHE_KEY}.txt"
+CACHE_FILE="${TRANSCRIPT_CACHE_DIR}/${FILE_HASH}-${MODEL}.txt"
 
 # Check cache
 if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then

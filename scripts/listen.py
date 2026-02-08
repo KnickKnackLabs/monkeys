@@ -19,9 +19,8 @@ def main():
 
     model = Model(args.model, **kwargs)
     segments = model.transcribe(args.input)
-
-    for segment in segments:
-        print(segment.text)
+    text = " ".join(segment.text.strip() for segment in segments)
+    print(text)
 
 
 if __name__ == "__main__":
