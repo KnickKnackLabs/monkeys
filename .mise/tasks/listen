@@ -30,8 +30,20 @@ if [[ "$RECORD" == "true" ]]; then
     mise run record "${RECORD_ARGS[@]}"
     FILE="$RECORD_FILE"
 elif [[ -z "$FILE" ]]; then
-    echo "Error: Provide an audio file or use --record" >&2
-    exit 1
+    if [[ -t 0 ]]; then
+        echo "Error: Provide an audio file, use --record, or pipe audio to stdin" >&2
+        exit 1
+    fi
+    # Read audio from stdin to temp file
+    STDIN_TMPDIR=$(mktemp -d /tmp/monkeys-stdin-XXXXXX)
+    STDIN_FILE="${STDIN_TMPDIR}/input.wav"
+    cat > "$STDIN_FILE"
+    if [[ ! -s "$STDIN_FILE" ]]; then
+        echo "Error: No audio data received from stdin" >&2
+        rm -rf "$STDIN_TMPDIR"
+        exit 1
+    fi
+    FILE="$STDIN_FILE"
 else
     # Resolve relative input path to caller's directory
     if [[ "$FILE" != /* ]]; then
@@ -64,7 +76,7 @@ mkdir -p "$MODEL_DIR"
 # Resample to 16kHz WAV (whisper requirement)
 LISTEN_TMPDIR=$(mktemp -d /tmp/monkeys-listen-XXXXXX)
 TMPFILE="${LISTEN_TMPDIR}/resampled.wav"
-trap 'rm -rf "$LISTEN_TMPDIR" "${RECORD_TMPDIR:-}"' EXIT
+trap 'rm -rf "$LISTEN_TMPDIR" "${RECORD_TMPDIR:-}" "${STDIN_TMPDIR:-}"' EXIT
 ffmpeg -i "$FILE" -ar 16000 -ac 1 -y "$TMPFILE" 2>/dev/null
 
 # Transcription cache
