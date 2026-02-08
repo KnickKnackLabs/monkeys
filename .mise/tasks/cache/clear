@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+#MISE description="Clear the audio cache"
+#MISE hide=true
+
+AUDIO_CACHE_DIR="${HOME}/.cache/monkeys/audio"
+
+if [[ ! -d "$AUDIO_CACHE_DIR" ]] || [[ -z "$(ls -A "$AUDIO_CACHE_DIR" 2>/dev/null)" ]]; then
+    echo "Audio cache is already empty."
+    exit 0
+fi
+
+COUNT=$(ls -1 "$AUDIO_CACHE_DIR"/*.wav 2>/dev/null | wc -l | tr -d ' ')
+TOTAL_BYTES=0
+for f in "$AUDIO_CACHE_DIR"/*.wav; do
+    BYTES=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
+    TOTAL_BYTES=$((TOTAL_BYTES + BYTES))
+done
+
+SIZE=$(mise run --quiet _format-bytes "$TOTAL_BYTES")
+rm -f "$AUDIO_CACHE_DIR"/*.wav
+echo "Cleared $COUNT cached audio files ($SIZE)"
