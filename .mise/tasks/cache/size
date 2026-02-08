@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-#MISE description="Show audio cache stats"
+#MISE description="Show cache stats"
 #MISE hide=true
 
-STATS=$(mise run --quiet _cache-stats)
-COUNT="${STATS%% *}"
-SIZE="${STATS#* }"
+AUDIO_STATS=$(mise run --quiet _cache-stats "${HOME}/.cache/monkeys/audio" wav)
+AUDIO_COUNT="${AUDIO_STATS%% *}"
+AUDIO_SIZE="${AUDIO_STATS#* }"
 
-echo "Audio cache: $COUNT entries, $SIZE"
-echo "Location: ${HOME}/.cache/monkeys/audio"
+TRANSCRIPT_STATS=$(mise run --quiet _cache-stats "${HOME}/.cache/monkeys/transcripts" txt)
+TRANSCRIPT_COUNT="${TRANSCRIPT_STATS%% *}"
+TRANSCRIPT_SIZE="${TRANSCRIPT_STATS#* }"
+
+echo "Audio cache:       $AUDIO_COUNT entries, $AUDIO_SIZE"
+echo "Transcript cache:  $TRANSCRIPT_COUNT entries, $TRANSCRIPT_SIZE"
+echo "Location: ${HOME}/.cache/monkeys"

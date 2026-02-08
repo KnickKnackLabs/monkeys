@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+#MISE description="Transcribe speech from an audio file"
+#USAGE arg "<file>" help="Audio file to transcribe (WAV)"
+#USAGE flag "-o --output <file>" help="Save transcription to file (default: print to stdout)"
+#USAGE flag "--model <model>" help="Whisper model to use (e.g. tiny.en, base.en, small.en)" default="base.en"
+#USAGE flag "--no-cache" help="Skip cache (force re-transcription)"
+
+set -e
+
+FILE="${usage_file}"
+OUTPUT="${usage_output}"
+MODEL="${usage_model}"
+NO_CACHE="${usage_no_cache:-false}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Resolve relative input path to caller's directory
+if [[ "$FILE" != /* ]]; then
+    FILE="${CALLER_DIR}/${FILE}"
+fi
+
+# Validate input file exists
+if [[ ! -f "$FILE" ]]; then
+    echo "Error: File not found: $FILE" >&2
+    exit 1
+fi
+
+# Resolve relative output path if specified
+if [[ -n "$OUTPUT" && "$OUTPUT" != /* ]]; then
+    OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+# Check for ffmpeg (needed for resampling)
+if ! command -v ffmpeg &>/dev/null; then
+    echo "Error: ffmpeg is required for audio resampling." >&2
+    echo "  Install: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)" >&2
+    exit 1
+fi
+
+# Model cache directory
+MODEL_DIR="${HOME}/.cache/monkeys/whisper"
+mkdir -p "$MODEL_DIR"
+
+# Resample to 16kHz WAV (whisper requirement)
+TMPFILE=$(mktemp /tmp/monkeys-listen-XXXXXX.wav)
+trap 'rm -f "$TMPFILE"' EXIT
+ffmpeg -i "$FILE" -ar 16000 -ac 1 -y "$TMPFILE" 2>/dev/null
+
+# Transcription cache
+TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
+FILE_HASH=$(shasum -a 256 "$TMPFILE" | cut -d' ' -f1)
+CACHE_KEY=$(echo -n "${FILE_HASH}|${MODEL}" | shasum -a 256 | cut -d' ' -f1)
+CACHE_FILE="${TRANSCRIPT_CACHE_DIR}/${CACHE_KEY}.txt"
+
+# Check cache
+if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then
+    TRANSCRIPTION=$(cat "$CACHE_FILE")
+    echo "(cached)" >&2
+else
+    echo "Transcribing..." >&2
+    echo "  Input: $FILE" >&2
+    echo "  Model: $MODEL" >&2
+
+    TRANSCRIPTION=$(uv run "$REPO_DIR/scripts/listen.py" \
+        --input "$TMPFILE" \
+        --model "$MODEL" \
+        --models-dir "$MODEL_DIR" 2>/dev/null)
+
+    echo "  Done!" >&2
+
+    # Store in cache
+    if [[ "$NO_CACHE" != "true" ]]; then
+        mkdir -p "$TRANSCRIPT_CACHE_DIR"
+        echo "$TRANSCRIPTION" > "$CACHE_FILE"
+    fi
+fi
+
+# Output transcription
+if [[ -n "$OUTPUT" ]]; then
+    echo "$TRANSCRIPTION" > "$OUTPUT"
+    echo "Transcription saved to $OUTPUT" >&2
+else
+    echo "$TRANSCRIPTION"
+fi

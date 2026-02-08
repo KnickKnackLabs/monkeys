@@ -15,6 +15,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "  monkeys generate <prompt>   Generate an image from a text prompt"
 echo "  monkeys speak <text>        Generate speech from text"
+echo "  monkeys listen <file>       Transcribe speech from an audio file"
 echo "  monkeys welcome             This message"
 echo "  monkeys tasks               List all available tasks"
 echo ""
@@ -25,6 +26,8 @@ echo "  monkeys generate \"pixel art sunset\" -o sunset.png"
 echo "  monkeys generate \"a cat\" --model stabilityai/stable-diffusion-xl-base-1.0"
 echo "  monkeys speak \"Hello world\""
 echo "  monkeys speak \"Good morning\" --voice af_bella -o morning.wav"
+echo "  monkeys listen recording.wav"
+echo "  monkeys listen recording.wav -o transcript.txt"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Setup:"
@@ -37,12 +40,17 @@ else
     echo "            Get a token at https://huggingface.co/settings/tokens"
 fi
 echo "  speak:    runs locally, no token needed"
+echo "  listen:   runs locally, no token needed (requires ffmpeg)"
 echo ""
 # Cache stats
-STATS=$(mise run --quiet _cache-stats)
-CACHE_COUNT="${STATS%% *}"
-CACHE_SIZE="${STATS#* }"
-echo "  Cache:    $CACHE_COUNT entries, $CACHE_SIZE"
+AUDIO_STATS=$(mise run --quiet _cache-stats "${HOME}/.cache/monkeys/audio" wav)
+AUDIO_COUNT="${AUDIO_STATS%% *}"
+AUDIO_SIZE="${AUDIO_STATS#* }"
+TRANSCRIPT_STATS=$(mise run --quiet _cache-stats "${HOME}/.cache/monkeys/transcripts" txt)
+TRANSCRIPT_COUNT="${TRANSCRIPT_STATS%% *}"
+TRANSCRIPT_SIZE="${TRANSCRIPT_STATS#* }"
+echo "  Audio cache:       $AUDIO_COUNT entries, $AUDIO_SIZE"
+echo "  Transcript cache:  $TRANSCRIPT_COUNT entries, $TRANSCRIPT_SIZE"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
