@@ -40,7 +40,8 @@ monkeys speak "Good morning" --voice af_bella --play
 # Speech-to-text (local, requires ffmpeg)
 monkeys listen recording.wav
 monkeys listen recording.wav -o transcript.txt
-monkeys listen recording.wav --model tiny.en
+monkeys listen --record -d 5              # Record from mic for 5 seconds
+monkeys listen --record                   # Record until Ctrl+C
 
 monkeys welcome   # Verify setup
 monkeys tasks     # List all commands

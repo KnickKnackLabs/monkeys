@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#MISE description="Record audio from microphone"
+#MISE hide=true
+#USAGE arg "<output>" help="Output WAV file path"
+#USAGE flag "-d --duration <seconds>" help="Recording duration in seconds (omit for manual stop with Ctrl+C)"
+
+set -e
+
+OUTPUT="${usage_output}"
+DURATION="${usage_duration}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+
+# Resolve relative output path to caller's directory
+if [[ "$OUTPUT" != /* ]]; then
+    OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+# Check for ffmpeg
+if ! command -v ffmpeg &>/dev/null; then
+    echo "Error: ffmpeg is required for recording." >&2
+    echo "  Install: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)" >&2
+    exit 1
+fi
+
+# Platform-specific input device
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    INPUT_FORMAT="avfoundation"
+    INPUT_DEVICE=":0"
+elif command -v pactl &>/dev/null; then
+    INPUT_FORMAT="pulse"
+    INPUT_DEVICE="default"
+else
+    INPUT_FORMAT="alsa"
+    INPUT_DEVICE="hw:0"
+fi
+
+# Build ffmpeg args
+FFMPEG_ARGS=(
+    -f "$INPUT_FORMAT"
+    -i "$INPUT_DEVICE"
+    -ar 16000
+    -ac 1
+    -c:a pcm_s16le
+    -y
+)
+
+if [[ -n "$DURATION" ]]; then
+    FFMPEG_ARGS+=(-t "$DURATION")
+    echo "Recording for ${DURATION}s..." >&2
+else
+    echo "Recording... (press Ctrl+C to stop)" >&2
+fi
+
+ffmpeg "${FFMPEG_ARGS[@]}" "$OUTPUT" 2>/dev/null
+
+echo "Saved to $OUTPUT" >&2
