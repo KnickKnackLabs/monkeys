@@ -39,19 +39,10 @@ fi
 echo "  speak:    runs locally, no token needed"
 echo ""
 # Cache stats
-AUDIO_CACHE_DIR="${HOME}/.cache/monkeys/audio"
-if [[ -d "$AUDIO_CACHE_DIR" ]] && [[ -n "$(ls -A "$AUDIO_CACHE_DIR" 2>/dev/null)" ]]; then
-    CACHE_COUNT=$(ls -1 "$AUDIO_CACHE_DIR"/*.wav 2>/dev/null | wc -l | tr -d ' ')
-    CACHE_BYTES=0
-    for f in "$AUDIO_CACHE_DIR"/*.wav; do
-        BYTES=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
-        CACHE_BYTES=$((CACHE_BYTES + BYTES))
-    done
-    CACHE_SIZE=$(mise run --quiet _format-bytes "$CACHE_BYTES")
-    echo "  Cache:    $CACHE_COUNT entries, $CACHE_SIZE"
-else
-    echo "  Cache:    empty"
-fi
+STATS=$(mise run --quiet _cache-stats)
+CACHE_COUNT="${STATS%% *}"
+CACHE_SIZE="${STATS#* }"
+echo "  Cache:    $CACHE_COUNT entries, $CACHE_SIZE"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
