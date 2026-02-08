@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 #MISE description="Transcribe speech from an audio file"
-#USAGE arg "<file>" help="Audio file to transcribe (WAV)"
+#USAGE arg "[file]" help="Audio file to transcribe (WAV)"
 #USAGE flag "-o --output <file>" help="Save transcription to file (default: print to stdout)"
 #USAGE flag "--model <model>" help="Whisper model to use (e.g. tiny.en, base.en, small.en)" default="base.en"
 #USAGE flag "--no-cache" help="Skip cache (force re-transcription)"
+#USAGE flag "--record" help="Record from microphone before transcribing"
+#USAGE flag "-d --duration <seconds>" help="Recording duration in seconds (with --record)"
 
 set -e
 
@@ -11,19 +13,36 @@ FILE="${usage_file}"
 OUTPUT="${usage_output}"
 MODEL="${usage_model}"
 NO_CACHE="${usage_no_cache:-false}"
+RECORD="${usage_record:-false}"
+DURATION="${usage_duration}"
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Resolve relative input path to caller's directory
-if [[ "$FILE" != /* ]]; then
-    FILE="${CALLER_DIR}/${FILE}"
-fi
-
-# Validate input file exists
-if [[ ! -f "$FILE" ]]; then
-    echo "Error: File not found: $FILE" >&2
+# Record from microphone if --record flag is set
+if [[ "$RECORD" == "true" ]]; then
+    RECORD_TMPDIR=$(mktemp -d /tmp/monkeys-record-XXXXXX)
+    RECORD_FILE="${RECORD_TMPDIR}/recording.wav"
+    RECORD_ARGS=("$RECORD_FILE")
+    if [[ -n "$DURATION" ]]; then
+        RECORD_ARGS+=(-d "$DURATION")
+    fi
+    mise run record "${RECORD_ARGS[@]}"
+    FILE="$RECORD_FILE"
+elif [[ -z "$FILE" ]]; then
+    echo "Error: Provide an audio file or use --record" >&2
     exit 1
+else
+    # Resolve relative input path to caller's directory
+    if [[ "$FILE" != /* ]]; then
+        FILE="${CALLER_DIR}/${FILE}"
+    fi
+
+    # Validate input file exists
+    if [[ ! -f "$FILE" ]]; then
+        echo "Error: File not found: $FILE" >&2
+        exit 1
+    fi
 fi
 
 # Resolve relative output path if specified
@@ -43,8 +62,9 @@ MODEL_DIR="${HOME}/.cache/monkeys/whisper"
 mkdir -p "$MODEL_DIR"
 
 # Resample to 16kHz WAV (whisper requirement)
-TMPFILE=$(mktemp /tmp/monkeys-listen-XXXXXX.wav)
-trap 'rm -f "$TMPFILE"' EXIT
+LISTEN_TMPDIR=$(mktemp -d /tmp/monkeys-listen-XXXXXX)
+TMPFILE="${LISTEN_TMPDIR}/resampled.wav"
+trap 'rm -rf "$LISTEN_TMPDIR" "${RECORD_TMPDIR:-}"' EXIT
 ffmpeg -i "$FILE" -ar 16000 -ac 1 -y "$TMPFILE" 2>/dev/null
 
 # Transcription cache
