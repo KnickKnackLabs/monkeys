@@ -1,17 +1,30 @@
 #!/usr/bin/env bash
-#MISE description="Clear the audio cache"
+#MISE description="Clear all caches"
 #MISE hide=true
 
 AUDIO_CACHE_DIR="${HOME}/.cache/monkeys/audio"
+TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
 
-STATS=$(mise run --quiet _cache-stats)
-COUNT="${STATS%% *}"
-SIZE="${STATS#* }"
+# Audio cache
+AUDIO_STATS=$(mise run --quiet _cache-stats "$AUDIO_CACHE_DIR" wav)
+AUDIO_COUNT="${AUDIO_STATS%% *}"
+AUDIO_SIZE="${AUDIO_STATS#* }"
 
-if [[ "$COUNT" -eq 0 ]]; then
-    echo "Audio cache is already empty."
-    exit 0
+if [[ "$AUDIO_COUNT" -gt 0 ]]; then
+    rm -f "$AUDIO_CACHE_DIR"/*.wav
+    echo "Cleared $AUDIO_COUNT cached audio files ($AUDIO_SIZE)"
 fi
 
-rm -f "$AUDIO_CACHE_DIR"/*.wav
-echo "Cleared $COUNT cached audio files ($SIZE)"
+# Transcript cache
+TRANSCRIPT_STATS=$(mise run --quiet _cache-stats "$TRANSCRIPT_CACHE_DIR" txt)
+TRANSCRIPT_COUNT="${TRANSCRIPT_STATS%% *}"
+TRANSCRIPT_SIZE="${TRANSCRIPT_STATS#* }"
+
+if [[ "$TRANSCRIPT_COUNT" -gt 0 ]]; then
+    rm -f "$TRANSCRIPT_CACHE_DIR"/*.txt
+    echo "Cleared $TRANSCRIPT_COUNT cached transcripts ($TRANSCRIPT_SIZE)"
+fi
+
+if [[ "$AUDIO_COUNT" -eq 0 && "$TRANSCRIPT_COUNT" -eq 0 ]]; then
+    echo "Caches are already empty."
+fi

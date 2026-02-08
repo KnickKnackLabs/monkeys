@@ -1,6 +1,6 @@
 # monkeys
 
-CLI for generating images via Hugging Face.
+CLI for generating media — images, speech, and transcription.
 
 ## Install
 
@@ -29,18 +29,21 @@ Get a token at https://huggingface.co/settings/tokens
 ## Usage
 
 ```bash
-monkeys generate "a cartoon monkey"                    # Generate image
-monkeys generate "pixel art sunset" -o sunset.png      # Custom output file
-monkeys generate "a cat" --model stabilityai/stable-diffusion-xl-base-1.0
+# Image generation (requires HF_TOKEN)
+monkeys generate "a cartoon monkey"
+monkeys generate "pixel art sunset" -o sunset.png
+
+# Text-to-speech (local, no token needed)
+monkeys speak "Hello world"
+monkeys speak "Good morning" --voice af_bella --play
+
+# Speech-to-text (local, requires ffmpeg)
+monkeys listen recording.wav
+monkeys listen recording.wav -o transcript.txt
+monkeys listen recording.wav --model tiny.en
 
 monkeys welcome   # Verify setup
 monkeys tasks     # List all commands
-```
-
-You can also pass the token directly:
-
-```bash
-monkeys generate "a dog" --token hf_your_token_here
 ```
 
 ## Development
