@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+#MISE description="Generate an animated GIF from text"
+#USAGE arg "[text]" help="Text to animate (reads from stdin if omitted)"
+#USAGE flag "-o --output <file>" help="Output file path" default="output.gif"
+#USAGE flag "--effect <effect>" help="Animation effect (typewriter, bounce, scroll)" default="typewriter"
+#USAGE flag "--width <px>" help="Frame width in pixels" default="400"
+#USAGE flag "--height <px>" help="Frame height in pixels" default="200"
+#USAGE flag "--fps <n>" help="Frames per second" default="10"
+#USAGE flag "--duration <secs>" help="Animation duration in seconds" default="2"
+#USAGE flag "--bg <color>" help="Background color" default="black"
+#USAGE flag "--fg <color>" help="Text/foreground color" default="white"
+#USAGE flag "--font-size <px>" help="Font size in pixels" default="40"
+#USAGE flag "--stdout" help="Write GIF to stdout instead of file"
+#USAGE flag "--no-cache" help="Skip cache (force regeneration)"
+#USAGE flag "--no-meta" help="Don't save metadata sidecar file"
+
+set -e
+
+TEXT="${usage_text}"
+OUTPUT="${usage_output}"
+EFFECT="${usage_effect}"
+WIDTH="${usage_width}"
+HEIGHT="${usage_height}"
+FPS="${usage_fps}"
+DURATION="${usage_duration}"
+BG="${usage_bg}"
+FG="${usage_fg}"
+FONT_SIZE="${usage_font_size}"
+STDOUT="${usage_stdout:-false}"
+NO_CACHE="${usage_no_cache:-false}"
+NO_META="${usage_no_meta:-false}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Read text from stdin if no argument provided
+if [[ -z "$TEXT" ]]; then
+    if [[ -t 0 ]]; then
+        echo "Error: Provide text as an argument or pipe to stdin" >&2
+        exit 1
+    fi
+    trap '' INT
+    TEXT=$(cat)
+    trap - INT
+    if [[ -z "$TEXT" ]]; then
+        echo "Error: No text received from stdin" >&2
+        exit 1
+    fi
+fi
+
+# Resolve relative output paths to caller's directory
+if [[ "$OUTPUT" != /* ]]; then
+    OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+# In stdout mode, write to temp file and skip metadata
+if [[ "$STDOUT" == "true" ]]; then
+    GIF_TMPDIR=$(mktemp -d /tmp/monkeys-gif-XXXXXX)
+    trap 'rm -rf "$GIF_TMPDIR"' EXIT
+    OUTPUT="${GIF_TMPDIR}/output.gif"
+    NO_META="true"
+fi
+
+# GIF cache
+GIF_CACHE_DIR="${HOME}/.cache/monkeys/gifs"
+CACHE_KEY=$(echo -n "${TEXT}|${EFFECT}|${WIDTH}|${HEIGHT}|${FPS}|${DURATION}|${BG}|${FG}|${FONT_SIZE}" | shasum -a 256 | cut -d' ' -f1)
+CACHE_FILE="${GIF_CACHE_DIR}/${CACHE_KEY}.gif"
+
+# Check cache
+if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then
+    cp "$CACHE_FILE" "$OUTPUT"
+    echo "Cache hit! GIF copied to $OUTPUT" >&2
+else
+    echo "Generating GIF..." >&2
+    echo "  Text: $TEXT" >&2
+    echo "  Effect: $EFFECT" >&2
+    echo "  Size: ${WIDTH}x${HEIGHT}" >&2
+    echo "  FPS: $FPS, Duration: ${DURATION}s" >&2
+    echo "  Output: $OUTPUT" >&2
+
+    uv run "$REPO_DIR/scripts/gif.py" \
+        --text "$TEXT" \
+        --output "$OUTPUT" \
+        --effect "$EFFECT" \
+        --width "$WIDTH" \
+        --height "$HEIGHT" \
+        --fps "$FPS" \
+        --duration "$DURATION" \
+        --bg "$BG" \
+        --fg "$FG" \
+        --font-size "$FONT_SIZE"
+
+    echo "Done! GIF saved to $OUTPUT" >&2
+
+    # Store in cache
+    if [[ "$NO_CACHE" != "true" ]]; then
+        mkdir -p "$GIF_CACHE_DIR"
+        cp "$OUTPUT" "$CACHE_FILE"
+    fi
+fi
+
+# Save metadata sidecar
+if [[ "$NO_META" != "true" ]]; then
+    META_FILE="${OUTPUT%.*}.json"
+    TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+    SIZE_BYTES=$(stat -f%z "$OUTPUT" 2>/dev/null || stat -c%s "$OUTPUT" 2>/dev/null || echo "0")
+
+    jq -n \
+        --arg text "$TEXT" \
+        --arg effect "$EFFECT" \
+        --arg width "$WIDTH" \
+        --arg height "$HEIGHT" \
+        --arg fps "$FPS" \
+        --arg duration "$DURATION" \
+        --arg bg "$BG" \
+        --arg fg "$FG" \
+        --arg font_size "$FONT_SIZE" \
+        --arg timestamp "$TIMESTAMP" \
+        --argjson size "$SIZE_BYTES" \
+        --arg output "$(basename "$OUTPUT")" \
+        '{text: $text, effect: $effect, width: $width, height: $height, fps: $fps, duration: $duration, bg: $bg, fg: $fg, font_size: $font_size, timestamp: $timestamp, size_bytes: $size, output: $output}' \
+        > "$META_FILE"
+    echo "  Metadata saved to $META_FILE" >&2
+fi
+
+# Write to stdout if requested
+if [[ "$STDOUT" == "true" ]]; then
+    cat "$OUTPUT"
+fi
