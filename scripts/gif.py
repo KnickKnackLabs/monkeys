@@ -6,12 +6,29 @@ import argparse
 import math
 from PIL import Image, ImageDraw, ImageFont
 
+# Cross-platform monospace font discovery
+FONT_PATHS = [
+    "/System/Library/Fonts/Menlo.ttc",          # macOS
+    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",  # Debian/Ubuntu
+    "/usr/share/fonts/dejavu-sans-mono-fonts/DejaVuSansMono.ttf",  # Fedora
+    "/usr/share/fonts/TTF/DejaVuSansMono.ttf",  # Arch
+]
+
+
+def load_font(size):
+    for path in FONT_PATHS:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size=size)
+
 
 def typewriter(text, width, height, fps, duration, bg, fg, font_size):
     """Characters appear one by one."""
     frames = []
     total_frames = int(fps * duration)
-    font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", font_size)
+    font = load_font(font_size)
 
     for i in range(total_frames):
         img = Image.new("RGBA", (width, height), bg)
@@ -40,7 +57,7 @@ def bounce(text, width, height, fps, duration, bg, fg, font_size):
     """Text bounces vertically."""
     frames = []
     total_frames = int(fps * duration)
-    font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", font_size)
+    font = load_font(font_size)
     bbox = font.getbbox(text)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
@@ -63,7 +80,7 @@ def scroll(text, width, height, fps, duration, bg, fg, font_size):
     """Text scrolls horizontally across the frame."""
     frames = []
     total_frames = int(fps * duration)
-    font = ImageFont.truetype("/System/Library/Fonts/Menlo.ttc", font_size)
+    font = load_font(font_size)
     bbox = font.getbbox(text)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
