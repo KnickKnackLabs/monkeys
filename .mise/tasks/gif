@@ -10,6 +10,7 @@
 #USAGE flag "--bg <color>" help="Background color" default="black"
 #USAGE flag "--fg <color>" help="Text/foreground color" default="white"
 #USAGE flag "--font-size <px>" help="Font size in pixels" default="40"
+#USAGE flag "--view" help="Open GIF after generating"
 #USAGE flag "--stdout" help="Write GIF to stdout instead of file"
 #USAGE flag "--no-cache" help="Skip cache (force regeneration)"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
@@ -26,6 +27,7 @@ DURATION="${usage_duration}"
 BG="${usage_bg}"
 FG="${usage_fg}"
 FONT_SIZE="${usage_font_size}"
+VIEW="${usage_view:-false}"
 STDOUT="${usage_stdout:-false}"
 NO_CACHE="${usage_no_cache:-false}"
 NO_META="${usage_no_meta:-false}"
@@ -121,6 +123,11 @@ if [[ "$NO_META" != "true" ]]; then
         '{text: $text, effect: $effect, width: $width, height: $height, fps: $fps, duration: $duration, bg: $bg, fg: $fg, font_size: $font_size, timestamp: $timestamp, size_bytes: $size, output: $output}' \
         > "$META_FILE"
     echo "  Metadata saved to $META_FILE" >&2
+fi
+
+# View if requested
+if [[ "$VIEW" == "true" ]]; then
+    mise run view "$OUTPUT"
 fi
 
 # Write to stdout if requested
