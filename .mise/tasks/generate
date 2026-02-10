@@ -4,6 +4,7 @@
 #USAGE flag "-o --output <file>" help="Output file path" default="output.jpg"
 #USAGE flag "--model <model>" help="Hugging Face model" default="black-forest-labs/FLUX.1-schnell"
 #USAGE flag "--token <token>" help="Hugging Face API token (or set HF_TOKEN env var)"
+#USAGE flag "--view" help="Open image after generating"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
 
 set -e
@@ -12,6 +13,7 @@ PROMPT="${usage_prompt}"
 OUTPUT="${usage_output}"
 MODEL="${usage_model}"
 TOKEN="${usage_token:-$HF_TOKEN}"
+VIEW="${usage_view:-false}"
 NO_META="${usage_no_meta:-false}"
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 
@@ -92,4 +94,9 @@ if [[ "$NO_META" != "true" ]]; then
         '{prompt: $prompt, model: $model, timestamp: $timestamp, format: $format, size_bytes: $size, output: $output}' \
         > "$META_FILE"
     echo "  Metadata saved to $META_FILE"
+fi
+
+# View if requested
+if [[ "$VIEW" == "true" ]]; then
+    mise run view "$FINAL_OUTPUT"
 fi

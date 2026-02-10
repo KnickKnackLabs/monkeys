@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+#MISE description="View an image or GIF"
+#MISE hide=true
+#USAGE arg "<file>" help="Image or GIF file to view"
+
+set -e
+
+FILE="${usage_file}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+
+# Resolve relative paths to caller's directory
+if [[ "$FILE" != /* ]]; then
+    FILE="${CALLER_DIR}/${FILE}"
+fi
+
+if [[ ! -f "$FILE" ]]; then
+    echo "Error: File not found: $FILE" >&2
+    exit 1
+fi
+
+case "$(uname -s)" in
+    Darwin)
+        qlmanage -p "$FILE" &>/dev/null
+        ;;
+    Linux)
+        if command -v xdg-open &>/dev/null; then
+            xdg-open "$FILE"
+        elif command -v eog &>/dev/null; then
+            eog "$FILE"
+        elif command -v feh &>/dev/null; then
+            feh "$FILE"
+        else
+            echo "Error: No image viewer found. Install xdg-open, eog, or feh." >&2
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Error: Unsupported OS: $(uname -s)" >&2
+        exit 1
+        ;;
+esac
