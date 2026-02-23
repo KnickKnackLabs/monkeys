@@ -53,4 +53,4 @@ monkeys tasks     # List all commands
 
 ## Development
 
-This project uses [shimmer](https://github.com/ricon-family/shimmer) for agent workflows.
+This project uses [shimmer](https://github.com/KnickKnackLabs/shimmer) for agent workflows.
