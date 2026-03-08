@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Transcribe speech from an audio file"
+#USAGE arg "<file>" help="Audio file to transcribe"
+#USAGE flag "-o --output <file>" help="Save transcription to file (default: print to stdout)"
+#USAGE flag "--no-cache" help="Skip cache (force re-transcription)"
+set -e
+
+mise run -q listen:whisper "${@}"

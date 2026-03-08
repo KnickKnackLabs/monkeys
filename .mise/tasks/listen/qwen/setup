@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+#MISE description="Build qwen-asr binary and download model weights"
+#USAGE flag "--model <model>" help="Model variant to download" default="qwen3-asr-0.6b" {
+#USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
+#USAGE }
+#USAGE flag "--force" help="Force rebuild and re-download"
+set -e
+
+MODEL="${usage_model}"
+FORCE="${usage_force:-false}"
+QWEN_DIR="${HOME}/.cache/monkeys/qwen-asr"
+SRC_DIR="${QWEN_DIR}/src"
+BINARY="${QWEN_DIR}/qwen_asr"
+MODEL_DIR="${QWEN_DIR}/${MODEL}"
+
+mkdir -p "$QWEN_DIR"
+
+# --- Build binary ---
+if [[ -x "$BINARY" && "$FORCE" != "true" ]]; then
+    echo "Binary already built: $BINARY" >&2
+else
+    echo "Building qwen-asr..." >&2
+
+    # Clone or update source
+    if [[ -d "$SRC_DIR/.git" ]]; then
+        git -C "$SRC_DIR" pull --quiet
+    else
+        rm -rf "$SRC_DIR"
+        git clone --quiet https://github.com/antirez/qwen-asr.git "$SRC_DIR"
+    fi
+
+    # Build
+    make -C "$SRC_DIR" blas 2>&1 | tail -5
+    cp "$SRC_DIR/qwen_asr" "$BINARY"
+
+    echo "  Built: $BINARY" >&2
+fi
+
+# --- Download model ---
+if [[ -f "${MODEL_DIR}/config.json" && "$FORCE" != "true" ]]; then
+    echo "Model already downloaded: $MODEL_DIR" >&2
+else
+    echo "Downloading ${MODEL}..." >&2
+    mkdir -p "$MODEL_DIR"
+
+    HF_REPO="Qwen/Qwen3-ASR-$(echo "$MODEL" | sed 's/qwen3-asr-//' | tr '[:lower:]' '[:upper:]' | sed 's/0.6B/0.6B/;s/1.7B/1.7B/')"
+
+    # Map model to HuggingFace repo
+    case "$MODEL" in
+        qwen3-asr-0.6b)
+            HF_REPO="Qwen/Qwen3-ASR-0.6B"
+            FILES="config.json generation_config.json model.safetensors vocab.json merges.txt"
+            ;;
+        qwen3-asr-1.7b)
+            HF_REPO="Qwen/Qwen3-ASR-1.7B"
+            FILES="config.json generation_config.json model.safetensors.index.json model-00001-of-00002.safetensors model-00002-of-00002.safetensors vocab.json merges.txt"
+            ;;
+    esac
+
+    BASE_URL="https://huggingface.co/${HF_REPO}/resolve/main"
+
+    for file in $FILES; do
+        dest="${MODEL_DIR}/${file}"
+        if [[ -f "$dest" && "$FORCE" != "true" ]]; then
+            echo "  Already exists: $file" >&2
+            continue
+        fi
+        echo "  Downloading: $file" >&2
+        curl -fL -o "$dest" "${BASE_URL}/${file}"
+    done
+
+    echo "  Model saved: $MODEL_DIR" >&2
+fi
+
+echo "" >&2
+echo "Setup complete. Run: monkeys listen:qwen <file>" >&2
