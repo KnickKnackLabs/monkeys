@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+#MISE description="Transcribe speech using Qwen3-ASR (via antirez/qwen-asr)"
+#USAGE arg "<file>" help="Audio file to transcribe"
+#USAGE flag "-o --output <file>" help="Save transcription to file (default: print to stdout)"
+#USAGE flag "--no-cache" help="Skip cache (force re-transcription)"
+#USAGE flag "--model <model>" help="Model variant" default="qwen3-asr-0.6b" {
+#USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
+#USAGE }
+set -e
+
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+FILE="${usage_file}"
+OUTPUT="${usage_output}"
+MODEL="${usage_model}"
+NO_CACHE="${usage_no_cache:-false}"
+
+# Resolve relative paths
+if [[ "$FILE" != /* ]]; then
+    FILE="${CALLER_DIR}/${FILE}"
+fi
+if [[ -n "$OUTPUT" && "$OUTPUT" != /* ]]; then
+    OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+# Validate input
+if [[ ! -f "$FILE" ]]; then
+    echo "Error: File not found: $FILE" >&2
+    exit 1
+fi
+
+# Check for ffmpeg
+if ! command -v ffmpeg &>/dev/null; then
+    echo "Error: ffmpeg is required for audio conversion." >&2
+    echo "  Install: brew install ffmpeg (macOS) or apt install ffmpeg (Linux)" >&2
+    exit 1
+fi
+
+# Paths
+QWEN_DIR="${HOME}/.cache/monkeys/qwen-asr"
+BINARY="${QWEN_DIR}/qwen_asr"
+MODEL_DIR="${QWEN_DIR}/${MODEL}"
+
+# Check setup
+if [[ ! -x "$BINARY" ]]; then
+    echo "Error: qwen-asr binary not found. Run: monkeys listen:qwen:setup" >&2
+    exit 1
+fi
+if [[ ! -d "$MODEL_DIR" ]]; then
+    echo "Error: Model ${MODEL} not found. Run: monkeys listen:qwen:setup" >&2
+    exit 1
+fi
+
+# Transcription cache
+TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
+FILE_HASH=$(shasum -a 256 "$FILE" | cut -d' ' -f1)
+CACHE_FILE="${TRANSCRIPT_CACHE_DIR}/${FILE_HASH}-${MODEL}.txt"
+
+# Check cache
+if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then
+    TRANSCRIPTION=$(cat "$CACHE_FILE")
+    echo "(cached)" >&2
+else
+    echo "Transcribing..." >&2
+    echo "  Input: $FILE" >&2
+    echo "  Model: $MODEL" >&2
+
+    TRANSCRIPTION=$(ffmpeg -i "$FILE" -f s16le -ar 16000 -ac 1 - 2>/dev/null | \
+        "$BINARY" -d "$MODEL_DIR" --stdin --silent)
+
+    echo "  Done!" >&2
+
+    # Store in cache
+    if [[ "$NO_CACHE" != "true" ]]; then
+        mkdir -p "$TRANSCRIPT_CACHE_DIR"
+        echo "$TRANSCRIPTION" > "$CACHE_FILE"
+    fi
+fi
+
+# Output
+if [[ -n "$OUTPUT" ]]; then
+    echo "$TRANSCRIPTION" > "$OUTPUT"
+    echo "Transcription saved to $OUTPUT" >&2
+else
+    echo "$TRANSCRIPTION"
+fi

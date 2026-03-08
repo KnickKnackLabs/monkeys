@@ -17,7 +17,7 @@ RECORD="${usage_record:-false}"
 DURATION="${usage_duration}"
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Record from microphone if --record flag is set
 if [[ "$RECORD" == "true" ]]; then
@@ -93,7 +93,7 @@ else
     echo "  Input: $FILE" >&2
     echo "  Model: $MODEL" >&2
 
-    TRANSCRIPTION=$(uv run "$REPO_DIR/scripts/listen.py" \
+    TRANSCRIPTION=$(uv run "$REPO_DIR/scripts/listen/whisper.py" \
         --input "$TMPFILE" \
         --model "$MODEL" \
         --models-dir "$MODEL_DIR" 2>/dev/null)
