@@ -6,7 +6,7 @@
 set -e
 
 FILE="${usage_file}"
-CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+CALLER_DIR="${CALLER_PWD:-$(pwd)}"
 
 # Resolve relative paths to caller's directory
 if [[ "$FILE" != /* ]]; then

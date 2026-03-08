@@ -8,7 +8,7 @@
 #USAGE }
 set -e
 
-CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+CALLER_DIR="${CALLER_PWD:-$(pwd)}"
 FILE="${usage_file}"
 OUTPUT="${usage_output}"
 MODEL="${usage_model}"
