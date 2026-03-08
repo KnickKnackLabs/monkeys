@@ -19,7 +19,7 @@ PLAY="${usage_play:-false}"
 STDOUT="${usage_stdout:-false}"
 NO_CACHE="${usage_no_cache:-false}"
 NO_META="${usage_no_meta:-false}"
-CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+CALLER_DIR="${CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 

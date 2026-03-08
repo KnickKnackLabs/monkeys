@@ -8,7 +8,7 @@ set -e
 
 OUTPUT="${usage_output}"
 DURATION="${usage_duration}"
-CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+CALLER_DIR="${CALLER_PWD:-$(pwd)}"
 
 # Resolve relative output path to caller's directory
 if [[ "$OUTPUT" != /* ]]; then

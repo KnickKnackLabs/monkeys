@@ -15,7 +15,7 @@ MODEL="${usage_model}"
 TOKEN="${usage_token:-$HF_TOKEN}"
 VIEW="${usage_view:-false}"
 NO_META="${usage_no_meta:-false}"
-CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+CALLER_DIR="${CALLER_PWD:-$(pwd)}"
 
 # Resolve relative output paths to caller's directory
 if [[ "$OUTPUT" != /* ]]; then
