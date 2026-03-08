@@ -43,8 +43,6 @@ else
     echo "Downloading ${MODEL}..." >&2
     mkdir -p "$MODEL_DIR"
 
-    HF_REPO="Qwen/Qwen3-ASR-$(echo "$MODEL" | sed 's/qwen3-asr-//' | tr '[:lower:]' '[:upper:]' | sed 's/0.6B/0.6B/;s/1.7B/1.7B/')"
-
     # Map model to HuggingFace repo
     case "$MODEL" in
         qwen3-asr-0.6b)
