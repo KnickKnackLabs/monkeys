@@ -5,4 +5,4 @@
 #USAGE flag "--no-cache" help="Skip cache (force re-transcription)"
 set -e
 
-mise run -q listen:whisper "${@}"
+mise run -q listen:qwen "${@}"
