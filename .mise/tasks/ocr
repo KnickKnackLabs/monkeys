@@ -5,7 +5,7 @@
 #USAGE flag "--text-only" help="Output plain text only, one line per region"
 #USAGE flag "--lang <lang>" help="Language code" default="en"
 
-set -e
+set -euo pipefail
 
 IMAGE="${usage_image}"
 FIND="${usage_find:-}"

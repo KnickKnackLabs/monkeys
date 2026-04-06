@@ -1,3 +1,4 @@
+#!/usr/bin/env -S uv run --script
 # /// script
 # dependencies = ["Pillow"]
 # ///
@@ -6,6 +7,9 @@
 
 Run with: uv run test/fixtures/generate.py
 Output: test/fixtures/test-ocr.png
+
+Uses Pillow's built-in default font at size 36 for portability across
+macOS, Linux, and CI (no system font dependencies).
 """
 
 from pathlib import Path
@@ -18,11 +22,9 @@ OUTPUT = FIXTURE_DIR / "test-ocr.png"
 img = Image.new("RGB", (800, 400), "white")
 draw = ImageDraw.Draw(img)
 
-# Use a readable font size for reliable OCR detection
-try:
-    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
-except (IOError, OSError):
-    font = ImageFont.load_default(size=36)
+# Use Pillow's built-in font — no system font dependency.
+# load_default(size=N) requires Pillow >= 10.1.0.
+font = ImageFont.load_default(size=36)
 
 draw.text((50, 50), "Hello World", fill="black", font=font)
 draw.text((50, 150), "Select", fill="blue", font=font)
