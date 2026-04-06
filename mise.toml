@@ -1,2 +1,9 @@
 [tools]
 uv = "latest"
+bats = "1.13.0"
+usage = "1"
+jq = "latest"
+
+[settings]
+quiet = true
+task_output = "interleave"

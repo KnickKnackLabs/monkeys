@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+#MISE description="Extract text and coordinates from an image"
+#USAGE arg "<image>" help="Path to image file"
+#USAGE flag "--find <text>" help="Filter results by substring (case-insensitive)"
+#USAGE flag "--text-only" help="Output plain text only, one line per region"
+#USAGE flag "--lang <lang>" help="Language code" default="en"
+
+set -euo pipefail
+
+IMAGE="${usage_image}"
+FIND="${usage_find:-}"
+TEXT_ONLY="${usage_text_only:-false}"
+OCR_LANG="${usage_lang}"
+CALLER_DIR="${CALLER_PWD:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Resolve relative image paths to caller's directory
+if [[ "$IMAGE" != /* ]]; then
+  IMAGE="${CALLER_DIR}/${IMAGE}"
+fi
+
+if [[ ! -f "$IMAGE" ]]; then
+  echo "Error: file not found: $IMAGE" >&2
+  exit 1
+fi
+
+# Build args
+ARGS=("$IMAGE" --lang "$OCR_LANG")
+
+if [[ -n "$FIND" ]]; then
+  ARGS+=(--find "$FIND")
+fi
+
+if [[ "$TEXT_ONLY" == "true" ]]; then
+  ARGS+=(--text-only)
+fi
+
+uv run "$REPO_DIR/scripts/ocr.py" "${ARGS[@]}"
