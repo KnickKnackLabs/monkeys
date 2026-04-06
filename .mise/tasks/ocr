@@ -10,7 +10,7 @@ set -e
 IMAGE="${usage_image}"
 FIND="${usage_find:-}"
 TEXT_ONLY="${usage_text_only:-false}"
-LANG="${usage_lang}"
+OCR_LANG="${usage_lang}"
 CALLER_DIR="${CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -26,7 +26,7 @@ if [[ ! -f "$IMAGE" ]]; then
 fi
 
 # Build args
-ARGS=("$IMAGE" --lang "$LANG")
+ARGS=("$IMAGE" --lang "$OCR_LANG")
 
 if [[ -n "$FIND" ]]; then
   ARGS+=(--find "$FIND")
