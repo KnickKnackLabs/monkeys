@@ -75,6 +75,9 @@ if [ "$stream" = "true" ]; then
 else
   printf 'final transcript'
 fi
+if [ -n "${MONKEYS_TEST_QWEN_EXIT_AFTER_WRITE:-}" ]; then
+  exit "$MONKEYS_TEST_QWEN_EXIT_AFTER_WRITE"
+fi
 MOCK_QWEN
 
   chmod +x "$FFMPEG" "$QWEN_ASR_DIR/qwen_asr"
@@ -115,6 +118,14 @@ MOCK_QWEN
   [[ "$output" == *"raw audio from :unit"* ]]
 }
 
+@test "listen treats interrupted raw stdout recording as a clean live stop" {
+  export MONKEYS_TEST_FFMPEG_EXIT_AFTER_WRITE=255
+  run monkeys listen --device ':unit' --duration 1
+  unset MONKEYS_TEST_FFMPEG_EXIT_AFTER_WRITE
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"raw audio from :unit"* ]]
+}
+
 @test "listen rejects raw stdout and file output together" {
   run monkeys listen --raw -o recording.wav
   [ "$status" -ne 0 ]
@@ -137,6 +148,14 @@ MOCK_QWEN
   [ "$output" = "live chunk one live chunk two" ]
   grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"
   grep -q 'stdin=raw-audio' "$MONKEYS_TEST_QWEN_LOG"
+}
+
+@test "hear treats interrupted streaming transcription as a clean live stop" {
+  export MONKEYS_TEST_QWEN_EXIT_AFTER_WRITE=130
+  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear 2>"$BATS_TEST_TMPDIR/stderr"'
+  unset MONKEYS_TEST_QWEN_EXIT_AFTER_WRITE
+  [ "$status" -eq 0 ]
+  [ "$output" = "live chunk one live chunk two" ]
 }
 
 @test "hear --batch disables stdin streaming" {

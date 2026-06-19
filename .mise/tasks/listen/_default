@@ -80,6 +80,13 @@ if [ "$RAW" = "true" ]; then
   write_stdout=true
 fi
 
+is_live_stop_status() {
+  case "${1:-}" in
+    0|130|141|143|255) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if [ "$write_stdout" = "true" ] && [ -t 1 ]; then
   printf 'monkeys listen: refusing to write raw audio to a terminal\n' >&2
   printf '  Pipe it: monkeys listen | monkeys hear\n' >&2
@@ -104,8 +111,17 @@ ffmpeg_args+=(
 )
 
 if [ "$write_stdout" = "true" ]; then
+  trap 'exit 0' INT TERM PIPE
   printf 'Recording raw audio from %s (%s) to stdout...\n' "$DEVICE" "$INPUT_FORMAT" >&2
+  set +e
   "$FFMPEG" "${ffmpeg_args[@]}" -f s16le -
+  ffmpeg_status=$?
+  set -e
+  trap - INT TERM PIPE
+  if is_live_stop_status "$ffmpeg_status"; then
+    exit 0
+  fi
+  exit "$ffmpeg_status"
 else
   output_dir="$(dirname "$OUTPUT")"
   output_base="$(basename "$OUTPUT")"

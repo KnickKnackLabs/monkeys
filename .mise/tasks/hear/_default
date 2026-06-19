@@ -12,4 +12,5 @@
 #USAGE }
 set -euo pipefail
 
+trap 'exit 0' INT TERM PIPE
 mise run -q hear:qwen ${@+"$@"}

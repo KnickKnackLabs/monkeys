@@ -108,6 +108,13 @@ if [ ! -d "$MODEL_DIR" ]; then
   exit 1
 fi
 
+is_live_stop_status() {
+  case "${1:-}" in
+    0|130|141|143|255) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 qwen_args=(-d "$MODEL_DIR" --stdin)
 if [ -n "$PROMPT" ]; then
   qwen_args+=(--prompt "$PROMPT")
@@ -127,13 +134,22 @@ emit_transcription() {
 }
 
 if [ "$stream" = "true" ]; then
+  trap 'exit 0' INT TERM PIPE
+  set +e
   if [ -n "$OUTPUT" ]; then
     mkdir -p "$(dirname "$OUTPUT")"
     emit_transcription | tee "$OUTPUT"
+    stream_status=$?
   else
     emit_transcription
+    stream_status=$?
   fi
-  exit 0
+  set -e
+  trap - INT TERM PIPE
+  if is_live_stop_status "$stream_status"; then
+    exit 0
+  fi
+  exit "$stream_status"
 fi
 
 TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
