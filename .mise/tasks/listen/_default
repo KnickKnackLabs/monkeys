@@ -107,12 +107,28 @@ if [ "$write_stdout" = "true" ]; then
   printf 'Recording raw audio from %s (%s) to stdout...\n' "$DEVICE" "$INPUT_FORMAT" >&2
   "$FFMPEG" "${ffmpeg_args[@]}" -f s16le -
 else
-  mkdir -p "$(dirname "$OUTPUT")"
+  output_dir="$(dirname "$OUTPUT")"
+  output_base="$(basename "$OUTPUT")"
+  tmp_output="${output_dir}/.${output_base}.tmp.$$"
+  mkdir -p "$output_dir"
+  cleanup_tmp_output() {
+    rm -f "$tmp_output"
+  }
+  trap cleanup_tmp_output EXIT
+
   printf 'Recording audio from %s (%s) to %s...\n' "$DEVICE" "$INPUT_FORMAT" "$OUTPUT" >&2
-  "$FFMPEG" "${ffmpeg_args[@]}" -y "$OUTPUT"
-  if [ ! -s "$OUTPUT" ]; then
+  set +e
+  "$FFMPEG" "${ffmpeg_args[@]}" -y "$tmp_output"
+  ffmpeg_status=$?
+  set -e
+  if [ ! -s "$tmp_output" ]; then
     printf 'Error: recording failed or produced an empty file: %s\n' "$OUTPUT" >&2
     exit 1
+  fi
+  mv "$tmp_output" "$OUTPUT"
+  trap - EXIT
+  if [ "$ffmpeg_status" -ne 0 ]; then
+    printf 'Recording command exited with status %s after writing audio; keeping %s\n' "$ffmpeg_status" "$OUTPUT" >&2
   fi
   printf 'Saved to %s\n' "$OUTPUT" >&2
 fi

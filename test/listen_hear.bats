@@ -32,11 +32,18 @@ for ((i = 0; i < $#; i++)); do
 done
 
 out="${args[$(( $# - 1 ))]}"
+if [ -n "${MONKEYS_TEST_FFMPEG_EXIT_BEFORE_WRITE:-}" ]; then
+  exit "$MONKEYS_TEST_FFMPEG_EXIT_BEFORE_WRITE"
+fi
+
 if [ "$out" = "-" ]; then
   printf 'raw audio from %s\n' "$input"
 else
   mkdir -p "$(dirname "$out")"
   printf 'wav audio from %s\n' "$input" > "$out"
+fi
+if [ -n "${MONKEYS_TEST_FFMPEG_EXIT_AFTER_WRITE:-}" ]; then
+  exit "$MONKEYS_TEST_FFMPEG_EXIT_AFTER_WRITE"
 fi
 MOCK_FFMPEG
 
@@ -79,6 +86,26 @@ MOCK_QWEN
   [ -s "$MONKEYS_CALLER_PWD/recording.wav" ]
   grep -q -- '-i :unit' "$MONKEYS_TEST_FFMPEG_LOG"
   [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Saved to $MONKEYS_CALLER_PWD/recording.wav"* ]]
+}
+
+@test "listen keeps interrupted WAV recordings that were written" {
+  export MONKEYS_TEST_FFMPEG_EXIT_AFTER_WRITE=130
+  run monkeys listen --device ':unit' -o interrupted.wav
+  unset MONKEYS_TEST_FFMPEG_EXIT_AFTER_WRITE
+  [ "$status" -eq 0 ]
+  [ -s "$MONKEYS_CALLER_PWD/interrupted.wav" ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Recording command exited with status 130 after writing audio"* ]]
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Saved to $MONKEYS_CALLER_PWD/interrupted.wav"* ]]
+}
+
+@test "listen does not let stale output mask failed recording" {
+  printf 'old audio\n' > "$MONKEYS_CALLER_PWD/stale.wav"
+  export MONKEYS_TEST_FFMPEG_EXIT_BEFORE_WRITE=1
+  run monkeys listen --device ':unit' -o stale.wav
+  unset MONKEYS_TEST_FFMPEG_EXIT_BEFORE_WRITE
+  [ "$status" -ne 0 ]
+  [ "$(cat "$MONKEYS_CALLER_PWD/stale.wav")" = "old audio" ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"recording failed or produced an empty file"* ]]
 }
 
 @test "listen writes raw audio to piped stdout when output is omitted" {
