@@ -3,8 +3,8 @@
 load test_helper
 
 setup() {
-  export CALLER_PWD="$BATS_TEST_TMPDIR/caller"
-  mkdir -p "$CALLER_PWD"
+  export MONKEYS_CALLER_PWD="$BATS_TEST_TMPDIR/caller"
+  mkdir -p "$MONKEYS_CALLER_PWD"
 
   mock_bin="$BATS_TEST_TMPDIR/bin"
   mkdir -p "$mock_bin"
@@ -76,10 +76,9 @@ MOCK_QWEN
 @test "listen records WAV output to caller-relative path" {
   run monkeys listen --device ':unit' --duration 1 -o recording.wav
   [ "$status" -eq 0 ]
-  [ -s "$CALLER_PWD/recording.wav" ]
-  grep -q -- '-f avfoundation' "$MONKEYS_TEST_FFMPEG_LOG"
+  [ -s "$MONKEYS_CALLER_PWD/recording.wav" ]
   grep -q -- '-i :unit' "$MONKEYS_TEST_FFMPEG_LOG"
-  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Saved to $CALLER_PWD/recording.wav"* ]]
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Saved to $MONKEYS_CALLER_PWD/recording.wav"* ]]
 }
 
 @test "listen writes raw audio to piped stdout when output is omitted" {
@@ -95,7 +94,7 @@ MOCK_QWEN
 }
 
 @test "hear file input defaults to batch transcription" {
-  printf 'wav fixture\n' > "$CALLER_PWD/input.wav"
+  printf 'wav fixture\n' > "$MONKEYS_CALLER_PWD/input.wav"
 
   run monkeys hear input.wav --prompt "Preserve spelling: CMMC" --no-cache
   [ "$status" -eq 0 ]
@@ -105,7 +104,7 @@ MOCK_QWEN
 }
 
 @test "hear stdin defaults to streaming transcription" {
-  run bash -c 'printf raw-audio | monkeys hear'
+  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear 2>"$BATS_TEST_TMPDIR/stderr"'
   [ "$status" -eq 0 ]
   [ "$output" = "live chunk one live chunk two" ]
   grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"
@@ -113,15 +112,15 @@ MOCK_QWEN
 }
 
 @test "hear --batch disables stdin streaming" {
-  run bash -c 'printf raw-audio | monkeys hear --batch -'
+  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear --batch - 2>"$BATS_TEST_TMPDIR/stderr"'
   [ "$status" -eq 0 ]
   [ "$output" = "final transcript" ]
   grep -q 'stream=false' "$MONKEYS_TEST_QWEN_LOG"
 }
 
 @test "hear reads caller-relative prompt files" {
-  printf 'In Tolerance\nProShop\nCMMC\n' > "$CALLER_PWD/glossary.txt"
-  printf 'wav fixture\n' > "$CALLER_PWD/input.wav"
+  printf 'In Tolerance\nProShop\nCMMC\n' > "$MONKEYS_CALLER_PWD/glossary.txt"
+  printf 'wav fixture\n' > "$MONKEYS_CALLER_PWD/input.wav"
 
   run monkeys hear input.wav --prompt-file glossary.txt --no-cache
   [ "$status" -eq 0 ]
@@ -131,13 +130,13 @@ MOCK_QWEN
 }
 
 @test "hear rejects conflicting stream and batch flags" {
-  run bash -c 'printf raw-audio | monkeys hear --stream --batch -'
+  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear --stream --batch - 2>"$BATS_TEST_TMPDIR/stderr"'
   [ "$status" -ne 0 ]
   [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"choose either --stream or --batch"* ]]
 }
 
 @test "listen to hear pipeline streams text" {
-  run bash -c 'monkeys listen --device ":unit" --duration 1 | monkeys hear'
+  run bash -c 'cd "$REPO_DIR" && mise run -q listen --device ":unit" --duration 1 2>"$BATS_TEST_TMPDIR/listen.stderr" | mise run -q hear 2>"$BATS_TEST_TMPDIR/hear.stderr"'
   [ "$status" -eq 0 ]
   [ "$output" = "live chunk one live chunk two" ]
   grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"

@@ -9,6 +9,7 @@
 [![tasks: mise](https://img.shields.io/badge/tasks-mise-7c3aed?style=flat)](https://mise.jdx.dev)
 [![runtime: uv + Python](https://img.shields.io/badge/runtime-uv%20%2B%20Python-de5fe9?style=flat)](https://docs.astral.sh/uv/)
 [![tests: 21 passing](https://img.shields.io/badge/tests-21%20passing-blue?style=flat)](https://bats-core.readthedocs.io)
+![lints: 9](https://img.shields.io/badge/lints-9-0ea5e9?style=flat)
 
 </div>
 
@@ -75,10 +76,13 @@ Set `HF_TOKEN` for Hugging Face API authentication (image generation only):
 export HF_TOKEN="hf_your_token_here"  # https://huggingface.co/settings/tokens
 ```
 
-## Testing
+## Validation
 
 ```bash
 mise run test
+codebase lint "$PWD"
+readme build --check
+git diff --check
 ```
 
-21 BATS tests. OCR tests use real EasyOCR against a generated fixture image.
+21 BATS tests. OCR tests use real EasyOCR against a generated fixture image. Codebase runs 9 convention lints.
