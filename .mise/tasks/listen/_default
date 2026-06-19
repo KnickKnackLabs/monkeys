@@ -109,8 +109,8 @@ if [ "$write_stdout" = "true" ]; then
 else
   output_dir="$(dirname "$OUTPUT")"
   output_base="$(basename "$OUTPUT")"
-  tmp_output="${output_dir}/.${output_base}.tmp.$$"
   mkdir -p "$output_dir"
+  tmp_output="$(mktemp "${output_dir}/.${output_base}.tmp.XXXXXX")"
   cleanup_tmp_output() {
     rm -f "$tmp_output"
   }
