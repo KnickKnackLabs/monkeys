@@ -1,0 +1,175 @@
+#!/usr/bin/env bash
+#MISE description="Transcribe speech using Qwen3-ASR (via antirez/qwen-asr)"
+#USAGE arg "[file]" default="" help="Audio file to transcribe, '-' for stdin, or omit when piping audio"
+#USAGE flag "-o --output <file>" default="" help="Save transcription to file (streaming mode also mirrors to stdout)"
+#USAGE flag "--no-cache" default=#false help="Skip cache (force re-transcription)"
+#USAGE flag "--stream" default=#false help="Emit incremental text as audio is processed; defaults on for stdin"
+#USAGE flag "--batch" default=#false help="Buffer stdin until EOF and emit one final transcript"
+#USAGE flag "--prompt <text>" default="" help="ASR biasing prompt/glossary text"
+#USAGE flag "--prompt-file <file>" default="" help="Read ASR biasing prompt/glossary text from file"
+#USAGE flag "--model <model>" default="qwen3-asr-0.6b" help="Model variant" {
+#USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
+#USAGE }
+set -euo pipefail
+
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+FFMPEG="${FFMPEG:-ffmpeg}"
+FILE="${usage_file:-}"
+OUTPUT="${usage_output:-}"
+MODEL="${usage_model:-qwen3-asr-0.6b}"
+NO_CACHE="${usage_no_cache:-false}"
+STREAM_FLAG="${usage_stream:-false}"
+BATCH_FLAG="${usage_batch:-false}"
+PROMPT="${usage_prompt:-}"
+PROMPT_FILE="${usage_prompt_file:-}"
+
+normalize_empty() {
+  case "${1:-}" in
+    ""|"''") printf '\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+FILE="$(normalize_empty "$FILE")"
+OUTPUT="$(normalize_empty "$OUTPUT")"
+PROMPT="$(normalize_empty "$PROMPT")"
+PROMPT_FILE="$(normalize_empty "$PROMPT_FILE")"
+
+if [ "$STREAM_FLAG" = "true" ] && [ "$BATCH_FLAG" = "true" ]; then
+  printf 'monkeys hear:qwen: choose either --stream or --batch, not both\n' >&2
+  exit 1
+fi
+
+input_is_stdin=false
+if [ -z "$FILE" ]; then
+  if [ -t 0 ]; then
+    printf 'monkeys hear:qwen: provide an audio file or pipe audio on stdin\n' >&2
+    exit 1
+  fi
+  FILE="-"
+fi
+if [ "$FILE" = "-" ]; then
+  input_is_stdin=true
+else
+  if [[ "$FILE" != /* ]]; then
+    FILE="${CALLER_DIR}/${FILE}"
+  fi
+  if [ ! -f "$FILE" ]; then
+    printf 'Error: File not found: %s\n' "$FILE" >&2
+    exit 1
+  fi
+fi
+
+if [ -n "$OUTPUT" ] && [[ "$OUTPUT" != /* ]]; then
+  OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+if [ -n "$PROMPT_FILE" ]; then
+  if [[ "$PROMPT_FILE" != /* ]]; then
+    PROMPT_FILE="${CALLER_DIR}/${PROMPT_FILE}"
+  fi
+  if [ ! -f "$PROMPT_FILE" ]; then
+    printf 'Error: Prompt file not found: %s\n' "$PROMPT_FILE" >&2
+    exit 1
+  fi
+  file_prompt="$(cat "$PROMPT_FILE")"
+  if [ -n "$PROMPT" ]; then
+    PROMPT="${PROMPT}
+${file_prompt}"
+  else
+    PROMPT="$file_prompt"
+  fi
+fi
+
+stream=false
+if [ "$STREAM_FLAG" = "true" ]; then
+  stream=true
+elif [ "$BATCH_FLAG" = "true" ]; then
+  stream=false
+elif [ "$input_is_stdin" = "true" ]; then
+  stream=true
+fi
+
+if [ "$input_is_stdin" != "true" ] && ! command -v "$FFMPEG" >/dev/null 2>&1; then
+  printf 'Error: ffmpeg is required for audio conversion.\n' >&2
+  exit 1
+fi
+
+QWEN_DIR="${QWEN_ASR_DIR:-${HOME}/.cache/monkeys/qwen-asr}"
+BINARY="${QWEN_ASR_BINARY:-${QWEN_DIR}/qwen_asr}"
+MODEL_DIR="${QWEN_ASR_MODEL_DIR:-${QWEN_DIR}/${MODEL}}"
+
+if [ ! -x "$BINARY" ]; then
+  printf 'Error: qwen-asr binary not found. Run: monkeys hear:qwen:setup\n' >&2
+  exit 1
+fi
+if [ ! -d "$MODEL_DIR" ]; then
+  printf 'Error: Model %s not found. Run: monkeys hear:qwen:setup\n' "$MODEL" >&2
+  exit 1
+fi
+
+qwen_args=(-d "$MODEL_DIR" --stdin)
+if [ -n "$PROMPT" ]; then
+  qwen_args+=(--prompt "$PROMPT")
+fi
+if [ "$stream" = "true" ]; then
+  qwen_args+=(--stream)
+else
+  qwen_args+=(--silent)
+fi
+
+emit_transcription() {
+  if [ "$input_is_stdin" = "true" ]; then
+    "$BINARY" "${qwen_args[@]}"
+  else
+    "$FFMPEG" -i "$FILE" -f s16le -ar 16000 -ac 1 - 2>/dev/null | "$BINARY" "${qwen_args[@]}"
+  fi
+}
+
+if [ "$stream" = "true" ]; then
+  if [ -n "$OUTPUT" ]; then
+    mkdir -p "$(dirname "$OUTPUT")"
+    emit_transcription | tee "$OUTPUT"
+  else
+    emit_transcription
+  fi
+  exit 0
+fi
+
+TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
+CACHE_FILE=""
+if [ "$NO_CACHE" != "true" ] && [ "$input_is_stdin" != "true" ]; then
+  FILE_HASH="$(shasum -a 256 "$FILE" | cut -d' ' -f1)"
+  PROMPT_HASH="$(printf '%s' "$PROMPT" | shasum -a 256 | cut -d' ' -f1)"
+  CACHE_FILE="${TRANSCRIPT_CACHE_DIR}/${FILE_HASH}-${MODEL}-${PROMPT_HASH}.txt"
+fi
+
+if [ -n "$CACHE_FILE" ] && [ -f "$CACHE_FILE" ]; then
+  TRANSCRIPTION="$(cat "$CACHE_FILE")"
+  printf '(cached)\n' >&2
+else
+  printf 'Transcribing...\n' >&2
+  if [ "$input_is_stdin" = "true" ]; then
+    printf '  Input: stdin\n' >&2
+  else
+    printf '  Input: %s\n' "$FILE" >&2
+  fi
+  printf '  Model: %s\n' "$MODEL" >&2
+
+  TRANSCRIPTION="$(emit_transcription)"
+
+  printf '  Done!\n' >&2
+
+  if [ -n "$CACHE_FILE" ]; then
+    mkdir -p "$TRANSCRIPT_CACHE_DIR"
+    printf '%s\n' "$TRANSCRIPTION" > "$CACHE_FILE"
+  fi
+fi
+
+if [ -n "$OUTPUT" ]; then
+  mkdir -p "$(dirname "$OUTPUT")"
+  printf '%s\n' "$TRANSCRIPTION" > "$OUTPUT"
+  printf 'Transcription saved to %s\n' "$OUTPUT" >&2
+else
+  printf '%s\n' "$TRANSCRIPTION"
+fi

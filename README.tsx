@@ -26,7 +26,26 @@ function countTests(): number {
   } catch { return 0; }
 }
 
+function countLints(): number {
+  try {
+    const miseToml = readFileSync(join(ROOT, "mise.toml"), "utf-8");
+    const start = miseToml.indexOf("[_.codebase]");
+    if (start === -1) return 0;
+
+    const block = miseToml.slice(start).split("\n");
+    const lines: string[] = [];
+    for (const [index, line] of block.entries()) {
+      if (index > 0 && line.startsWith("[")) break;
+      lines.push(line);
+    }
+
+    const list = lines.join("\n").match(/lint\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? "";
+    return [...list.matchAll(/"([^"]+)"/g)].length;
+  } catch { return 0; }
+}
+
 const testCount = countTests();
+const lintCount = countLints();
 
 // ── Readme ────────────────────────────────────────────────────────
 
@@ -45,6 +64,7 @@ const readme = (
         <Badge label="tasks" value="mise" color="7c3aed" href="https://mise.jdx.dev" />
         <Badge label="runtime" value="uv + Python" color="de5fe9" href="https://docs.astral.sh/uv/" />
         <Badge label="tests" value={`${testCount} passing`} color="blue" href="https://bats-core.readthedocs.io" />
+        <Badge label="lints" value={`${lintCount}`} color="0ea5e9" />
       </Badges>
     </Center>
 
@@ -66,9 +86,12 @@ monkeys generate "pixel art sunset" -o sunset.png
 monkeys speak "Hello world"
 monkeys speak "Good morning" --voice af_bella --play
 
-# Speech-to-text (local, requires ffmpeg)
-monkeys listen recording.wav
-monkeys listen --record -d 5
+# Audio input + speech-to-text (local, requires ffmpeg + Qwen setup)
+monkeys hear:qwen:setup                       # one-time local ASR setup
+monkeys listen -o recording.wav               # record microphone audio to a WAV file
+monkeys hear recording.wav                    # batch transcript from a complete file
+monkeys listen | monkeys hear                 # live microphone audio → streaming text
+monkeys hear --prompt-file glossary.txt -     # stdin defaults to streaming transcription
 
 # OCR — extract text and coordinates from images
 monkeys ocr screenshot.png                    # JSON with bounding boxes
@@ -111,11 +134,14 @@ monkeys ocr screenshot.png --text-only        # Plain text output`}</CodeBlock>
       <CodeBlock lang="bash">{`export HF_TOKEN="hf_your_token_here"  # https://huggingface.co/settings/tokens`}</CodeBlock>
     </Section>
 
-    <Section title="Testing">
-      <CodeBlock lang="bash">{`mise run test`}</CodeBlock>
+    <Section title="Validation">
+      <CodeBlock lang="bash">{`mise run test
+codebase lint "$PWD"
+readme build --check
+git diff --check`}</CodeBlock>
 
       <Paragraph>
-        {`${testCount} BATS tests. OCR tests use real EasyOCR against a generated fixture image.`}
+        {`${testCount} BATS tests. OCR tests use real EasyOCR against a generated fixture image. Codebase runs ${lintCount} convention lints.`}
       </Paragraph>
     </Section>
   </>

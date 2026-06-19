@@ -1,8 +1,134 @@
 #!/usr/bin/env bash
-#MISE description="Transcribe speech from an audio file"
-#USAGE arg "<file>" help="Audio file to transcribe"
-#USAGE flag "-o --output <file>" help="Save transcription to file (default: print to stdout)"
-#USAGE flag "--no-cache" help="Skip cache (force re-transcription)"
-set -e
+#MISE description="Record microphone audio"
+#USAGE flag "-o --output <file>" default="" help="Output WAV file; if omitted, write raw s16le 16kHz mono audio to piped stdout"
+#USAGE flag "-d --duration <seconds>" default="" help="Recording duration in seconds; omit to record until interrupted"
+#USAGE flag "--device <device>" default="" help="Input device (macOS AVFoundation example: :0); defaults to platform input"
+#USAGE flag "--raw" default=#false help="Force raw s16le 16kHz mono output to stdout"
+set -euo pipefail
 
-mise run -q listen:qwen "${@}"
+FFMPEG="${FFMPEG:-ffmpeg}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+OUTPUT="${usage_output:-}"
+DURATION="${usage_duration:-}"
+DEVICE="${usage_device:-}"
+RAW="${usage_raw:-false}"
+
+normalize_empty() {
+  case "${1:-}" in
+    ""|"''") printf '\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+OUTPUT="$(normalize_empty "$OUTPUT")"
+DURATION="$(normalize_empty "$DURATION")"
+DEVICE="$(normalize_empty "$DEVICE")"
+
+if [ -n "$DURATION" ]; then
+  case "$DURATION" in
+    ''|*[!0-9]*)
+      printf 'monkeys listen: duration must be a positive integer number of seconds, got %s\n' "$DURATION" >&2
+      exit 1
+      ;;
+    0)
+      printf 'monkeys listen: duration must be greater than zero\n' >&2
+      exit 1
+      ;;
+  esac
+fi
+
+if ! command -v "$FFMPEG" >/dev/null 2>&1; then
+  printf 'Error: ffmpeg is required for recording.\n' >&2
+  exit 1
+fi
+
+if [ -z "$DEVICE" ]; then
+  if [[ "${OSTYPE:-}" == darwin* ]]; then
+    INPUT_FORMAT="avfoundation"
+    DEVICE=":0"
+  elif command -v pactl >/dev/null 2>&1; then
+    INPUT_FORMAT="pulse"
+    DEVICE="default"
+  else
+    INPUT_FORMAT="alsa"
+    DEVICE="hw:0"
+  fi
+else
+  if [[ "${OSTYPE:-}" == darwin* ]]; then
+    INPUT_FORMAT="avfoundation"
+  elif command -v pactl >/dev/null 2>&1; then
+    INPUT_FORMAT="pulse"
+  else
+    INPUT_FORMAT="alsa"
+  fi
+fi
+
+if [ -n "$OUTPUT" ] && [ "$RAW" = "true" ]; then
+  printf 'monkeys listen: choose either --raw/stdout or --output, not both\n' >&2
+  exit 1
+fi
+
+if [ -n "$OUTPUT" ] && [[ "$OUTPUT" != /* ]]; then
+  OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+write_stdout=false
+if [ -z "$OUTPUT" ]; then
+  write_stdout=true
+fi
+if [ "$RAW" = "true" ]; then
+  write_stdout=true
+fi
+
+if [ "$write_stdout" = "true" ] && [ -t 1 ]; then
+  printf 'monkeys listen: refusing to write raw audio to a terminal\n' >&2
+  printf '  Pipe it: monkeys listen | monkeys hear\n' >&2
+  printf '  Or save it: monkeys listen -o recording.wav\n' >&2
+  exit 1
+fi
+
+ffmpeg_args=(
+  -hide_banner
+  -loglevel error
+  -f "$INPUT_FORMAT"
+  -i "$DEVICE"
+)
+if [ -n "$DURATION" ]; then
+  ffmpeg_args+=(-t "$DURATION")
+fi
+ffmpeg_args+=(
+  -vn
+  -ar 16000
+  -ac 1
+  -c:a pcm_s16le
+)
+
+if [ "$write_stdout" = "true" ]; then
+  printf 'Recording raw audio from %s (%s) to stdout...\n' "$DEVICE" "$INPUT_FORMAT" >&2
+  "$FFMPEG" "${ffmpeg_args[@]}" -f s16le -
+else
+  output_dir="$(dirname "$OUTPUT")"
+  output_base="$(basename "$OUTPUT")"
+  mkdir -p "$output_dir"
+  tmp_output="$(mktemp "${output_dir}/.${output_base}.tmp.XXXXXX")"
+  cleanup_tmp_output() {
+    rm -f "$tmp_output"
+  }
+  trap cleanup_tmp_output EXIT
+
+  printf 'Recording audio from %s (%s) to %s...\n' "$DEVICE" "$INPUT_FORMAT" "$OUTPUT" >&2
+  set +e
+  "$FFMPEG" "${ffmpeg_args[@]}" -y "$tmp_output"
+  ffmpeg_status=$?
+  set -e
+  if [ ! -s "$tmp_output" ]; then
+    printf 'Error: recording failed or produced an empty file: %s\n' "$OUTPUT" >&2
+    exit 1
+  fi
+  mv "$tmp_output" "$OUTPUT"
+  trap - EXIT
+  if [ "$ffmpeg_status" -ne 0 ]; then
+    printf 'Recording command exited with status %s after writing audio; keeping %s\n' "$ffmpeg_status" "$OUTPUT" >&2
+  fi
+  printf 'Saved to %s\n' "$OUTPUT" >&2
+fi

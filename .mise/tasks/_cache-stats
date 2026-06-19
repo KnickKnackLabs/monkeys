@@ -7,17 +7,23 @@
 CACHE_DIR="${usage_dir:-${HOME}/.cache/monkeys/audio}"
 EXT="${usage_ext:-wav}"
 
-if [[ ! -d "$CACHE_DIR" ]] || [[ -z "$(ls -A "$CACHE_DIR" 2>/dev/null)" ]]; then
+if [[ ! -d "$CACHE_DIR" ]]; then
     echo "0 empty"
     exit 0
 fi
 
-COUNT=$(ls -1 "$CACHE_DIR"/*."$EXT" 2>/dev/null | wc -l | tr -d ' ')
+COUNT=0
 TOTAL_BYTES=0
-for f in "$CACHE_DIR"/*."$EXT"; do
+while IFS= read -r -d '' f; do
+    COUNT=$((COUNT + 1))
     BYTES=$(stat -f%z "$f" 2>/dev/null || stat -c%s "$f" 2>/dev/null || echo 0)
     TOTAL_BYTES=$((TOTAL_BYTES + BYTES))
-done
+done < <(find "$CACHE_DIR" -type f -name "*.${EXT}" -print0)
+
+if [[ "$COUNT" -eq 0 ]]; then
+    echo "0 empty"
+    exit 0
+fi
 
 SIZE=$(mise run --quiet _format-bytes "$TOTAL_BYTES")
 echo "$COUNT $SIZE"

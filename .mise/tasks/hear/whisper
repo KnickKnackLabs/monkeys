@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+#MISE description="Transcribe speech using Whisper"
+#USAGE arg "[file]" default="" help="Audio file to transcribe, '-' for stdin, or omit when piping audio"
+#USAGE flag "-o --output <file>" default="" help="Save transcription to file (default: print to stdout)"
+#USAGE flag "--model <model>" default="base.en" help="Whisper model to use (e.g. tiny.en, base.en, small.en)"
+#USAGE flag "--no-cache" default=#false help="Skip cache (force re-transcription)"
+set -euo pipefail
+
+FILE="${usage_file:-}"
+OUTPUT="${usage_output:-}"
+MODEL="${usage_model:-base.en}"
+NO_CACHE="${usage_no_cache:-false}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+FFMPEG="${FFMPEG:-ffmpeg}"
+
+normalize_empty() {
+  case "${1:-}" in
+    ""|"''") printf '\n' ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+FILE="$(normalize_empty "$FILE")"
+OUTPUT="$(normalize_empty "$OUTPUT")"
+
+STDIN_TMPDIR=""
+if [ -z "$FILE" ] || [ "$FILE" = "-" ]; then
+  if [ -t 0 ]; then
+    printf 'Error: Provide an audio file or pipe audio to stdin\n' >&2
+    exit 1
+  fi
+  STDIN_TMPDIR="$(mktemp -d /tmp/monkeys-hear-stdin-XXXXXX)"
+  FILE="${STDIN_TMPDIR}/input.audio"
+  cat > "$FILE"
+  if [ ! -s "$FILE" ]; then
+    printf 'Error: No audio data received from stdin\n' >&2
+    rm -rf "$STDIN_TMPDIR"
+    exit 1
+  fi
+else
+  if [[ "$FILE" != /* ]]; then
+    FILE="${CALLER_DIR}/${FILE}"
+  fi
+  if [ ! -f "$FILE" ]; then
+    printf 'Error: File not found: %s\n' "$FILE" >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "$OUTPUT" && "$OUTPUT" != /* ]]; then
+  OUTPUT="${CALLER_DIR}/${OUTPUT}"
+fi
+
+if ! command -v "$FFMPEG" >/dev/null 2>&1; then
+  printf 'Error: ffmpeg is required for audio resampling.\n' >&2
+  exit 1
+fi
+
+MODEL_DIR="${HOME}/.cache/monkeys/whisper"
+mkdir -p "$MODEL_DIR"
+
+LISTEN_TMPDIR="$(mktemp -d /tmp/monkeys-hear-whisper-XXXXXX)"
+TMPFILE="${LISTEN_TMPDIR}/resampled.wav"
+trap 'rm -rf "$LISTEN_TMPDIR" "$STDIN_TMPDIR"' EXIT
+"$FFMPEG" -i "$FILE" -ar 16000 -ac 1 -y "$TMPFILE" 2>/dev/null
+
+TRANSCRIPT_CACHE_DIR="${HOME}/.cache/monkeys/transcripts"
+FILE_HASH="$(shasum -a 256 "$TMPFILE" | cut -d' ' -f1)"
+CACHE_FILE="${TRANSCRIPT_CACHE_DIR}/${FILE_HASH}-${MODEL}.txt"
+
+if [[ "$NO_CACHE" != "true" && -f "$CACHE_FILE" ]]; then
+  TRANSCRIPTION="$(cat "$CACHE_FILE")"
+  printf '(cached)\n' >&2
+else
+  printf 'Transcribing...\n' >&2
+  printf '  Input: %s\n' "$FILE" >&2
+  printf '  Model: %s\n' "$MODEL" >&2
+
+  TRANSCRIPTION="$(uv run "$REPO_DIR/scripts/hear/whisper.py" \
+    --input "$TMPFILE" \
+    --model "$MODEL" \
+    --models-dir "$MODEL_DIR" 2>/dev/null)"
+
+  printf '  Done!\n' >&2
+
+  if [[ "$NO_CACHE" != "true" ]]; then
+    mkdir -p "$TRANSCRIPT_CACHE_DIR"
+    printf '%s\n' "$TRANSCRIPTION" > "$CACHE_FILE"
+  fi
+fi
+
+if [[ -n "$OUTPUT" ]]; then
+  mkdir -p "$(dirname "$OUTPUT")"
+  printf '%s\n' "$TRANSCRIPTION" > "$OUTPUT"
+  printf 'Transcription saved to %s\n' "$OUTPUT" >&2
+else
+  printf '%s\n' "$TRANSCRIPTION"
+fi

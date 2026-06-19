@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+#MISE description="Build qwen-asr binary and download model weights"
+#USAGE flag "--model <model>" default="qwen3-asr-0.6b" help="Model variant to download" {
+#USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
+#USAGE }
+#USAGE flag "--force" default=#false help="Force rebuild and re-download"
+set -euo pipefail
+
+MODEL="${usage_model:-qwen3-asr-0.6b}"
+FORCE="${usage_force:-false}"
+QWEN_DIR="${QWEN_ASR_DIR:-${HOME}/.cache/monkeys/qwen-asr}"
+SRC_DIR="${QWEN_DIR}/src"
+BINARY="${QWEN_DIR}/qwen_asr"
+MODEL_DIR="${QWEN_DIR}/${MODEL}"
+
+mkdir -p "$QWEN_DIR"
+
+# --- Build binary ---
+if [[ -x "$BINARY" && "$FORCE" != "true" ]]; then
+  printf 'Binary already built: %s\n' "$BINARY" >&2
+else
+  printf 'Building qwen-asr...\n' >&2
+
+  if [[ -d "$SRC_DIR/.git" ]]; then
+    git -C "$SRC_DIR" pull --quiet
+  else
+    rm -rf "$SRC_DIR"
+    git clone --quiet https://github.com/antirez/qwen-asr.git "$SRC_DIR"
+  fi
+
+  make -C "$SRC_DIR" blas 2>&1 | tail -5
+  cp "$SRC_DIR/qwen_asr" "$BINARY"
+
+  printf '  Built: %s\n' "$BINARY" >&2
+fi
+
+# --- Download model ---
+if [[ -f "${MODEL_DIR}/config.json" && "$FORCE" != "true" ]]; then
+  printf 'Model already downloaded: %s\n' "$MODEL_DIR" >&2
+else
+  printf 'Downloading %s...\n' "$MODEL" >&2
+  mkdir -p "$MODEL_DIR"
+
+  case "$MODEL" in
+    qwen3-asr-0.6b)
+      HF_REPO="Qwen/Qwen3-ASR-0.6B"
+      FILES="config.json generation_config.json model.safetensors vocab.json merges.txt"
+      ;;
+    qwen3-asr-1.7b)
+      HF_REPO="Qwen/Qwen3-ASR-1.7B"
+      FILES="config.json generation_config.json model.safetensors.index.json model-00001-of-00002.safetensors model-00002-of-00002.safetensors vocab.json merges.txt"
+      ;;
+    *)
+      printf 'Unknown model: %s\n' "$MODEL" >&2
+      exit 1
+      ;;
+  esac
+
+  BASE_URL="https://huggingface.co/${HF_REPO}/resolve/main"
+
+  for file in $FILES; do
+    dest="${MODEL_DIR}/${file}"
+    if [[ -f "$dest" && "$FORCE" != "true" ]]; then
+      printf '  Already exists: %s\n' "$file" >&2
+      continue
+    fi
+    printf '  Downloading: %s\n' "$file" >&2
+    curl -fL -o "$dest" "${BASE_URL}/${file}"
+  done
+
+  printf '  Model saved: %s\n' "$MODEL_DIR" >&2
+fi
+
+printf '\n' >&2
+printf 'Setup complete. Run: monkeys hear <file>\n' >&2
