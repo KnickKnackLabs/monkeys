@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+#MISE description="Transcribe speech from audio"
+#USAGE arg "[file]" default="" help="Audio file to transcribe, '-' for stdin, or omit when piping audio"
+#USAGE flag "-o --output <file>" default="" help="Save transcription to file (streaming mode also mirrors to stdout)"
+#USAGE flag "--no-cache" default=#false help="Skip cache (force re-transcription)"
+#USAGE flag "--stream" default=#false help="Emit incremental text as audio is processed; defaults on for stdin"
+#USAGE flag "--batch" default=#false help="Buffer stdin until EOF and emit one final transcript"
+#USAGE flag "--prompt <text>" default="" help="ASR biasing prompt/glossary text"
+#USAGE flag "--prompt-file <file>" default="" help="Read ASR biasing prompt/glossary text from file"
+#USAGE flag "--model <model>" default="qwen3-asr-0.6b" help="Qwen model variant" {
+#USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
+#USAGE }
+set -euo pipefail
+
+mise run -q hear:qwen "${@}"

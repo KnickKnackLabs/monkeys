@@ -1,0 +1,145 @@
+#!/usr/bin/env bats
+
+load test_helper
+
+setup() {
+  export CALLER_PWD="$BATS_TEST_TMPDIR/caller"
+  mkdir -p "$CALLER_PWD"
+
+  mock_bin="$BATS_TEST_TMPDIR/bin"
+  mkdir -p "$mock_bin"
+
+  export FFMPEG="$mock_bin/ffmpeg"
+  export QWEN_ASR_DIR="$BATS_TEST_TMPDIR/qwen-asr"
+  export MONKEYS_TEST_FFMPEG_LOG="$BATS_TEST_TMPDIR/ffmpeg.log"
+  export MONKEYS_TEST_QWEN_LOG="$BATS_TEST_TMPDIR/qwen.log"
+  : > "$MONKEYS_TEST_FFMPEG_LOG"
+  : > "$MONKEYS_TEST_QWEN_LOG"
+
+  mkdir -p "$QWEN_ASR_DIR/qwen3-asr-0.6b"
+
+  cat > "$FFMPEG" <<'MOCK_FFMPEG'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >> "$MONKEYS_TEST_FFMPEG_LOG"
+
+input=""
+args=("$@")
+for ((i = 0; i < $#; i++)); do
+  if [ "${args[$i]}" = "-i" ]; then
+    input="${args[$((i + 1))]}"
+  fi
+done
+
+out="${args[$(( $# - 1 ))]}"
+if [ "$out" = "-" ]; then
+  printf 'raw audio from %s\n' "$input"
+else
+  mkdir -p "$(dirname "$out")"
+  printf 'wav audio from %s\n' "$input" > "$out"
+fi
+MOCK_FFMPEG
+
+  cat > "$QWEN_ASR_DIR/qwen_asr" <<'MOCK_QWEN'
+#!/usr/bin/env bash
+set -euo pipefail
+stream=false
+prompt=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --stream)
+      stream=true
+      shift
+      ;;
+    --prompt)
+      prompt="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+stdin_text="$(cat)"
+printf 'stream=%s\nprompt=%s\nstdin=%s\n---\n' "$stream" "$prompt" "$stdin_text" >> "$MONKEYS_TEST_QWEN_LOG"
+if [ "$stream" = "true" ]; then
+  printf 'live chunk one '
+  printf 'live chunk two'
+else
+  printf 'final transcript'
+fi
+MOCK_QWEN
+
+  chmod +x "$FFMPEG" "$QWEN_ASR_DIR/qwen_asr"
+}
+
+@test "listen records WAV output to caller-relative path" {
+  run monkeys listen --device ':unit' --duration 1 -o recording.wav
+  [ "$status" -eq 0 ]
+  [ -s "$CALLER_PWD/recording.wav" ]
+  grep -q -- '-f avfoundation' "$MONKEYS_TEST_FFMPEG_LOG"
+  grep -q -- '-i :unit' "$MONKEYS_TEST_FFMPEG_LOG"
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Saved to $CALLER_PWD/recording.wav"* ]]
+}
+
+@test "listen writes raw audio to piped stdout when output is omitted" {
+  run monkeys listen --device ':unit' --duration 1
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"raw audio from :unit"* ]]
+}
+
+@test "listen rejects raw stdout and file output together" {
+  run monkeys listen --raw -o recording.wav
+  [ "$status" -ne 0 ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"choose either --raw/stdout or --output"* ]]
+}
+
+@test "hear file input defaults to batch transcription" {
+  printf 'wav fixture\n' > "$CALLER_PWD/input.wav"
+
+  run monkeys hear input.wav --prompt "Preserve spelling: CMMC" --no-cache
+  [ "$status" -eq 0 ]
+  [ "$output" = "final transcript" ]
+  grep -q 'stream=false' "$MONKEYS_TEST_QWEN_LOG"
+  grep -q 'prompt=Preserve spelling: CMMC' "$MONKEYS_TEST_QWEN_LOG"
+}
+
+@test "hear stdin defaults to streaming transcription" {
+  run bash -c 'printf raw-audio | monkeys hear'
+  [ "$status" -eq 0 ]
+  [ "$output" = "live chunk one live chunk two" ]
+  grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"
+  grep -q 'stdin=raw-audio' "$MONKEYS_TEST_QWEN_LOG"
+}
+
+@test "hear --batch disables stdin streaming" {
+  run bash -c 'printf raw-audio | monkeys hear --batch -'
+  [ "$status" -eq 0 ]
+  [ "$output" = "final transcript" ]
+  grep -q 'stream=false' "$MONKEYS_TEST_QWEN_LOG"
+}
+
+@test "hear reads caller-relative prompt files" {
+  printf 'In Tolerance\nProShop\nCMMC\n' > "$CALLER_PWD/glossary.txt"
+  printf 'wav fixture\n' > "$CALLER_PWD/input.wav"
+
+  run monkeys hear input.wav --prompt-file glossary.txt --no-cache
+  [ "$status" -eq 0 ]
+  grep -q 'In Tolerance' "$MONKEYS_TEST_QWEN_LOG"
+  grep -q 'ProShop' "$MONKEYS_TEST_QWEN_LOG"
+  grep -q 'CMMC' "$MONKEYS_TEST_QWEN_LOG"
+}
+
+@test "hear rejects conflicting stream and batch flags" {
+  run bash -c 'printf raw-audio | monkeys hear --stream --batch -'
+  [ "$status" -ne 0 ]
+  [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"choose either --stream or --batch"* ]]
+}
+
+@test "listen to hear pipeline streams text" {
+  run bash -c 'monkeys listen --device ":unit" --duration 1 | monkeys hear'
+  [ "$status" -eq 0 ]
+  [ "$output" = "live chunk one live chunk two" ]
+  grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"
+  grep -q 'raw audio from :unit' "$MONKEYS_TEST_QWEN_LOG"
+}

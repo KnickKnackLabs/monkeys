@@ -66,9 +66,12 @@ monkeys generate "pixel art sunset" -o sunset.png
 monkeys speak "Hello world"
 monkeys speak "Good morning" --voice af_bella --play
 
-# Speech-to-text (local, requires ffmpeg)
-monkeys listen recording.wav
-monkeys listen --record -d 5
+# Audio input + speech-to-text (local, requires ffmpeg + Qwen setup)
+monkeys hear:qwen:setup                       # one-time local ASR setup
+monkeys listen -o recording.wav               # record microphone audio to a WAV file
+monkeys hear recording.wav                    # batch transcript from a complete file
+monkeys listen | monkeys hear                 # live microphone audio → streaming text
+monkeys hear --prompt-file glossary.txt -     # stdin defaults to streaming transcription
 
 # OCR — extract text and coordinates from images
 monkeys ocr screenshot.png                    # JSON with bounding boxes

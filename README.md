@@ -8,7 +8,7 @@
 
 [![tasks: mise](https://img.shields.io/badge/tasks-mise-7c3aed?style=flat)](https://mise.jdx.dev)
 [![runtime: uv + Python](https://img.shields.io/badge/runtime-uv%20%2B%20Python-de5fe9?style=flat)](https://docs.astral.sh/uv/)
-[![tests: 12 passing](https://img.shields.io/badge/tests-12%20passing-blue?style=flat)](https://bats-core.readthedocs.io)
+[![tests: 21 passing](https://img.shields.io/badge/tests-21%20passing-blue?style=flat)](https://bats-core.readthedocs.io)
 
 </div>
 
@@ -34,9 +34,12 @@ monkeys generate "pixel art sunset" -o sunset.png
 monkeys speak "Hello world"
 monkeys speak "Good morning" --voice af_bella --play
 
-# Speech-to-text (local, requires ffmpeg)
-monkeys listen recording.wav
-monkeys listen --record -d 5
+# Audio input + speech-to-text (local, requires ffmpeg + Qwen setup)
+monkeys hear:qwen:setup                       # one-time local ASR setup
+monkeys listen -o recording.wav               # record microphone audio to a WAV file
+monkeys hear recording.wav                    # batch transcript from a complete file
+monkeys listen | monkeys hear                 # live microphone audio → streaming text
+monkeys hear --prompt-file glossary.txt -     # stdin defaults to streaming transcription
 
 # OCR — extract text and coordinates from images
 monkeys ocr screenshot.png                    # JSON with bounding boxes
@@ -78,4 +81,4 @@ export HF_TOKEN="hf_your_token_here"  # https://huggingface.co/settings/tokens
 mise run test
 ```
 
-12 BATS tests. OCR tests use real EasyOCR against a generated fixture image.
+21 BATS tests. OCR tests use real EasyOCR against a generated fixture image.
