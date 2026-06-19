@@ -85,6 +85,7 @@ MOCK_QWEN
   [ "$status" -eq 0 ]
   [ -s "$MONKEYS_CALLER_PWD/recording.wav" ]
   grep -q -- '-i :unit' "$MONKEYS_TEST_FFMPEG_LOG"
+  grep -q -- '-f wav' "$MONKEYS_TEST_FFMPEG_LOG"
   [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"Saved to $MONKEYS_CALLER_PWD/recording.wav"* ]]
 }
 

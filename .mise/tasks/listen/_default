@@ -118,7 +118,7 @@ else
 
   printf 'Recording audio from %s (%s) to %s...\n' "$DEVICE" "$INPUT_FORMAT" "$OUTPUT" >&2
   set +e
-  "$FFMPEG" "${ffmpeg_args[@]}" -y "$tmp_output"
+  "$FFMPEG" "${ffmpeg_args[@]}" -f wav -y "$tmp_output"
   ffmpeg_status=$?
   set -e
   if [ ! -s "$tmp_output" ]; then
