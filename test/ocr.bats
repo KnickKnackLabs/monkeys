@@ -2,7 +2,7 @@
 
 load test_helper
 
-FIXTURE="$MISE_CONFIG_ROOT/test/fixtures/test-ocr.png"
+FIXTURE="$REPO_DIR/test/fixtures/test-ocr.png"
 
 # All tests use the real EasyOCR (integration tests).
 # First run downloads models (~50MB); subsequent runs use cache.

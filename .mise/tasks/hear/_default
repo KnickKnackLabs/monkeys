@@ -12,4 +12,4 @@
 #USAGE }
 set -euo pipefail
 
-mise run -q hear:qwen "${@}"
+mise run -q hear:qwen ${@+"$@"}

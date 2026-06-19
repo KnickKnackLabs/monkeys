@@ -11,7 +11,7 @@ IMAGE="${usage_image}"
 FIND="${usage_find:-}"
 TEXT_ONLY="${usage_text_only:-false}"
 OCR_LANG="${usage_lang}"
-CALLER_DIR="${CALLER_PWD:-$(pwd)}"
+CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
