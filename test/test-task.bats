@@ -71,7 +71,8 @@ arg_count() {
 
   run -127 monkeys test listen_hear --jobs 4
   [ "$status" -eq 127 ]
-  [[ "$output" == *"parallel runner '$MOCK_DIR/missing-rush' is unavailable for 4 jobs"* ]]
+  stderr="$(cat "$BATS_TEST_TMPDIR/stderr")"
+  [[ "$stderr" == *"parallel runner '$MOCK_DIR/missing-rush' is unavailable for 4 jobs"* ]]
   [ ! -e "$BATS_LOG" ]
 }
 
@@ -80,7 +81,8 @@ arg_count() {
 
   run -2 monkeys test listen_hear
   [ "$status" -eq 2 ]
-  [[ "$output" == *"must be a positive integer"* ]]
+  stderr="$(cat "$BATS_TEST_TMPDIR/stderr")"
+  [[ "$stderr" == *"must be a positive integer"* ]]
   [ ! -e "$BATS_LOG" ]
 }
 
