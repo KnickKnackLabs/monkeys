@@ -6,6 +6,8 @@
 #USAGE flag "--token <token>" help="Hugging Face API token (or set HF_TOKEN env var)"
 #USAGE flag "--view" help="Open image after generating"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
+#USAGE example "monkeys generate 'a cartoon monkey'" header="Generate an image with the default model"
+#USAGE example "monkeys generate 'pixel art sunset' -o sunset.png" header="Choose the output path"
 
 set -e
 

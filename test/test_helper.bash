@@ -9,7 +9,8 @@ monkeys() {
     echo "MONKEYS_CALLER_PWD not set" >&2
     return 1
   fi
-  cd "$REPO_DIR" && MONKEYS_CALLER_PWD="$MONKEYS_CALLER_PWD" mise run -q "$@" 2>"$BATS_TEST_TMPDIR/stderr"
+  local stderr_path="${MONKEYS_TEST_STDERR:-$BATS_TEST_TMPDIR/stderr}"
+  cd "$REPO_DIR" && MONKEYS_CALLER_PWD="$MONKEYS_CALLER_PWD" mise run -q "$@" 2>"$stderr_path"
 }
 export -f monkeys
 

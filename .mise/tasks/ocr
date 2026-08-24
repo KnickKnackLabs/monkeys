@@ -4,6 +4,8 @@
 #USAGE flag "--find <text>" help="Filter results by substring (case-insensitive)"
 #USAGE flag "--text-only" help="Output plain text only, one line per region"
 #USAGE flag "--lang <lang>" help="Language code" default="en"
+#USAGE example "monkeys ocr screenshot.png" header="Extract text and coordinates as JSON"
+#USAGE example "monkeys ocr screenshot.png --find Select" header="Find matching text regions"
 
 set -euo pipefail
 
@@ -36,4 +38,4 @@ if [[ "$TEXT_ONLY" == "true" ]]; then
   ARGS+=(--text-only)
 fi
 
-uv run "$REPO_DIR/scripts/ocr.py" "${ARGS[@]}"
+uv run "$REPO_DIR/scripts/ocr.py" ${ARGS[@]+"${ARGS[@]}"}

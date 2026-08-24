@@ -1,5 +1,6 @@
 /** @jsxImportSource jsx-md */
 
+import { execFileSync } from "child_process";
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 
@@ -32,15 +33,33 @@ function countLints(): number {
     const start = miseToml.indexOf("[_.codebase]");
     if (start === -1) return 0;
 
-    const block = miseToml.slice(start).split("\n");
-    const lines: string[] = [];
-    for (const [index, line] of block.entries()) {
+    const lines = miseToml.slice(start).split("\n");
+    const block: string[] = [];
+    for (const [index, line] of lines.entries()) {
       if (index > 0 && line.startsWith("[")) break;
-      lines.push(line);
+      block.push(line);
     }
 
-    const list = lines.join("\n").match(/lint\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? "";
-    return [...list.matchAll(/"([^"]+)"/g)].length;
+    const list = block.join("\n").match(/lint\s*=\s*\[([\s\S]*?)\]/)?.[1] ?? "";
+    const configured = [...list.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+    if (!configured.some((rule) => rule.startsWith("@"))) return configured.length;
+
+    const memberships = new Map<string, string[]>();
+    let currentGroup = "";
+    const groups = execFileSync("codebase", ["lint:groups"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    for (const line of groups.split("\n")) {
+      if (line.startsWith("@")) {
+        currentGroup = line;
+        memberships.set(currentGroup, []);
+      } else if (currentGroup && line.startsWith("  ")) {
+        memberships.get(currentGroup)!.push(line.trim());
+      }
+    }
+
+    return new Set(configured.flatMap((rule) => memberships.get(rule) ?? [rule])).size;
   } catch { return 0; }
 }
 

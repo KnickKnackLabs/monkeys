@@ -10,6 +10,8 @@
 #USAGE flag "--model <model>" default="qwen3-asr-0.6b" help="Qwen model variant" {
 #USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
 #USAGE }
+#USAGE example "monkeys hear recording.wav" header="Transcribe a complete audio file"
+#USAGE example "monkeys listen | monkeys hear" header="Stream microphone audio into live transcription"
 set -euo pipefail
 
 trap 'exit 0' INT TERM PIPE

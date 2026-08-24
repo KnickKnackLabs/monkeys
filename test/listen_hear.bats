@@ -143,7 +143,7 @@ MOCK_QWEN
 }
 
 @test "hear stdin defaults to streaming transcription" {
-  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear 2>"$BATS_TEST_TMPDIR/stderr"'
+  run bash -c 'printf raw-audio | monkeys hear'
   [ "$status" -eq 0 ]
   [ "$output" = "live chunk one live chunk two" ]
   grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"
@@ -152,14 +152,14 @@ MOCK_QWEN
 
 @test "hear treats interrupted streaming transcription as a clean live stop" {
   export MONKEYS_TEST_QWEN_EXIT_AFTER_WRITE=130
-  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear 2>"$BATS_TEST_TMPDIR/stderr"'
+  run bash -c 'printf raw-audio | monkeys hear'
   unset MONKEYS_TEST_QWEN_EXIT_AFTER_WRITE
   [ "$status" -eq 0 ]
   [ "$output" = "live chunk one live chunk two" ]
 }
 
 @test "hear --batch disables stdin streaming" {
-  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear --batch - 2>"$BATS_TEST_TMPDIR/stderr"'
+  run bash -c 'printf raw-audio | monkeys hear --batch -'
   [ "$status" -eq 0 ]
   [ "$output" = "final transcript" ]
   grep -q 'stream=false' "$MONKEYS_TEST_QWEN_LOG"
@@ -177,13 +177,13 @@ MOCK_QWEN
 }
 
 @test "hear rejects conflicting stream and batch flags" {
-  run bash -c 'cd "$REPO_DIR" && printf raw-audio | mise run -q hear --stream --batch - 2>"$BATS_TEST_TMPDIR/stderr"'
+  run bash -c 'printf raw-audio | monkeys hear --stream --batch -'
   [ "$status" -ne 0 ]
   [[ "$(cat "$BATS_TEST_TMPDIR/stderr")" == *"choose either --stream or --batch"* ]]
 }
 
 @test "listen to hear pipeline streams text" {
-  run bash -c 'cd "$REPO_DIR" && mise run -q listen --device ":unit" --duration 1 2>"$BATS_TEST_TMPDIR/listen.stderr" | mise run -q hear 2>"$BATS_TEST_TMPDIR/hear.stderr"'
+  run bash -c 'MONKEYS_TEST_STDERR="$BATS_TEST_TMPDIR/listen.stderr" monkeys listen --device ":unit" --duration 1 | MONKEYS_TEST_STDERR="$BATS_TEST_TMPDIR/hear.stderr" monkeys hear'
   [ "$status" -eq 0 ]
   [ "$output" = "live chunk one live chunk two" ]
   grep -q 'stream=true' "$MONKEYS_TEST_QWEN_LOG"

@@ -10,6 +10,8 @@
 #USAGE flag "--model <model>" default="qwen3-asr-0.6b" help="Model variant" {
 #USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
 #USAGE }
+#USAGE example "monkeys hear recording.wav" header="Transcribe a complete audio file"
+#USAGE example "monkeys listen | monkeys hear" header="Stream microphone audio into live transcription"
 set -euo pipefail
 
 CALLER_DIR="${MONKEYS_CALLER_PWD:-$(pwd)}"
@@ -127,9 +129,9 @@ fi
 
 emit_transcription() {
   if [ "$input_is_stdin" = "true" ]; then
-    "$BINARY" "${qwen_args[@]}"
+    "$BINARY" ${qwen_args[@]+"${qwen_args[@]}"}
   else
-    "$FFMPEG" -i "$FILE" -f s16le -ar 16000 -ac 1 - 2>/dev/null | "$BINARY" "${qwen_args[@]}"
+    "$FFMPEG" -i "$FILE" -f s16le -ar 16000 -ac 1 - 2>/dev/null | "$BINARY" ${qwen_args[@]+"${qwen_args[@]}"}
   fi
 }
 
