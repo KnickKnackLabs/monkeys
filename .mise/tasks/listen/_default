@@ -4,6 +4,8 @@
 #USAGE flag "-d --duration <seconds>" default="" help="Recording duration in seconds; omit to record until interrupted"
 #USAGE flag "--device <device>" default="" help="Input device (macOS AVFoundation example: :0); defaults to platform input"
 #USAGE flag "--raw" default=#false help="Force raw s16le 16kHz mono output to stdout"
+#USAGE example "monkeys listen -o recording.wav" header="Record microphone audio to a WAV file"
+#USAGE example "monkeys listen | monkeys hear" header="Stream microphone audio into transcription"
 set -euo pipefail
 
 FFMPEG="${FFMPEG:-ffmpeg}"
@@ -114,7 +116,7 @@ if [ "$write_stdout" = "true" ]; then
   trap 'exit 0' INT TERM PIPE
   printf 'Recording raw audio from %s (%s) to stdout...\n' "$DEVICE" "$INPUT_FORMAT" >&2
   set +e
-  "$FFMPEG" "${ffmpeg_args[@]}" -f s16le -
+  "$FFMPEG" ${ffmpeg_args[@]+"${ffmpeg_args[@]}"} -f s16le -
   ffmpeg_status=$?
   set -e
   trap - INT TERM PIPE
@@ -134,7 +136,7 @@ else
 
   printf 'Recording audio from %s (%s) to %s...\n' "$DEVICE" "$INPUT_FORMAT" "$OUTPUT" >&2
   set +e
-  "$FFMPEG" "${ffmpeg_args[@]}" -f wav -y "$tmp_output"
+  "$FFMPEG" ${ffmpeg_args[@]+"${ffmpeg_args[@]}"} -f wav -y "$tmp_output"
   ffmpeg_status=$?
   set -e
   if [ ! -s "$tmp_output" ]; then

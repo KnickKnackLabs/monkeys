@@ -4,6 +4,8 @@
 #USAGE   choices "qwen3-asr-0.6b" "qwen3-asr-1.7b"
 #USAGE }
 #USAGE flag "--force" default=#false help="Force rebuild and re-download"
+#USAGE example "monkeys hear:qwen:setup" header="Build Qwen ASR and download the default model"
+#USAGE example "monkeys hear:qwen:setup --model qwen3-asr-1.7b" header="Prepare the larger model"
 set -euo pipefail
 
 MODEL="${usage_model:-qwen3-asr-0.6b}"

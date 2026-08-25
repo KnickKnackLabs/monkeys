@@ -14,6 +14,8 @@
 #USAGE flag "--stdout" help="Write GIF to stdout instead of file"
 #USAGE flag "--no-cache" help="Skip cache (force regeneration)"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
+#USAGE example "monkeys gif 'Hello world' -o hello.gif" header="Generate an animated GIF"
+#USAGE example "printf 'Hello' | monkeys gif --stdout > hello.gif" header="Read text from stdin and write GIF bytes"
 
 set -e
 

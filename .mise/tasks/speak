@@ -8,6 +8,8 @@
 #USAGE flag "--stdout" help="Write WAV audio to stdout instead of file"
 #USAGE flag "--no-cache" help="Skip cache (force regeneration)"
 #USAGE flag "--no-meta" help="Don't save metadata sidecar file"
+#USAGE example "monkeys speak 'Hello world'" header="Generate speech with the default voice"
+#USAGE example "monkeys speak 'Good morning' --voice af_bella --play" header="Choose a voice and play the result"
 
 set -e
 

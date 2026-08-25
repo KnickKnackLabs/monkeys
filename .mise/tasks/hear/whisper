@@ -4,6 +4,8 @@
 #USAGE flag "-o --output <file>" default="" help="Save transcription to file (default: print to stdout)"
 #USAGE flag "--model <model>" default="base.en" help="Whisper model to use (e.g. tiny.en, base.en, small.en)"
 #USAGE flag "--no-cache" default=#false help="Skip cache (force re-transcription)"
+#USAGE example "monkeys hear:whisper recording.wav" header="Transcribe an audio file with Whisper"
+#USAGE example "printf 'audio' | monkeys hear:whisper -" header="Transcribe audio from stdin"
 set -euo pipefail
 
 FILE="${usage_file:-}"
