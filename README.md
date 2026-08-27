@@ -8,7 +8,7 @@
 
 [![tasks: mise](https://img.shields.io/badge/tasks-mise-7c3aed?style=flat)](https://mise.jdx.dev)
 [![runtime: uv + Python](https://img.shields.io/badge/runtime-uv%20%2B%20Python-de5fe9?style=flat)](https://docs.astral.sh/uv/)
-[![tests: 33 passing](https://img.shields.io/badge/tests-33%20passing-blue?style=flat)](https://bats-core.readthedocs.io)
+[![tests: 31 passing](https://img.shields.io/badge/tests-31%20passing-blue?style=flat)](https://bats-core.readthedocs.io)
 ![lints: 17](https://img.shields.io/badge/lints-17-0ea5e9?style=flat)
 
 </div>
@@ -85,4 +85,4 @@ readme build --check
 git diff --check
 ```
 
-33 BATS tests. OCR tests use real EasyOCR against a generated fixture image. Codebase runs 17 convention lints.
+31 BATS tests. OCR tests use real EasyOCR against a generated fixture image. Codebase runs 17 convention lints.

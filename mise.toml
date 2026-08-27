@@ -9,7 +9,7 @@ shiv = "https://github.com/KnickKnackLabs/vfox-shiv"
 
 [tools]
 uv = "latest"
-"aqua:KnickKnackLabs/bats-core" = "1.14.0-kkl.1"
+"aqua:KnickKnackLabs/bats-core" = "1.14.0-kkl.3"
 "aqua:shenwei356/rush" = "0.7.0"
 usage = "1"
 jq = "latest"
